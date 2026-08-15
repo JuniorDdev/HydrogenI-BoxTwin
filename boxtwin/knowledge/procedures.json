@@ -1,0 +1,6 @@
+[
+  {"id":"PROC-001","title":"Capacidade próxima do limite","tags":["capacity","capacidade","volume","cheio"],"content":"Confirme a leitura em duas capturas consecutivas, suspenda nova alimentação do box, sinalize a operação e programe retirada ou redistribuição do material."},
+  {"id":"PROC-002","title":"Baixa confiança de leitura","tags":["confidence","confiança","sensor","leitura"],"content":"Inspecione fixação e alinhamento do sensor, limpe cuidadosamente a janela óptica, confirme iluminação e vibração e execute nova calibração somente com o box vazio."},
+  {"id":"PROC-003","title":"Possível obstrução","tags":["obstruction","obstrução","zonas","poeira"],"content":"Interrompa a medição automática, verifique poeira ou objeto diante do sensor, faça limpeza segura, capture novamente e encaminhe para manutenção se menos de 48 zonas permanecerem válidas."},
+  {"id":"PROC-004","title":"Divergência volumétrica","tags":["erro","volume","calibração","divergência"],"content":"Compare as dimensões cadastradas com as dimensões internas reais, valide a linha de base vazia, repita três leituras e registre a diferença contra um volume conhecido."}
+]

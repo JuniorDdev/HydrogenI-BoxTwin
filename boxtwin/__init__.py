@@ -13,6 +13,7 @@ def create_app(test_config=None):
     app.config.update(load_config())
     if test_config:
         app.config.update(test_config)
+    app.secret_key = app.config["SECRET_KEY"]
 
     Path(app.config["DATABASE_PATH"]).parent.mkdir(parents=True, exist_ok=True)
     Path(app.config["CALIBRATION_PATH"]).parent.mkdir(parents=True, exist_ok=True)
@@ -27,4 +28,3 @@ def create_app(test_config=None):
         runtime.start()
 
     return app
-
