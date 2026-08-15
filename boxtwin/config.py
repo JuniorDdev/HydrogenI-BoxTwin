@@ -13,7 +13,7 @@ def load_config():
     root = Path(__file__).resolve().parent.parent
     return {
         "APP_HOST": os.getenv("APP_HOST", "0.0.0.0"),
-        "APP_PORT": int(os.getenv("APP_PORT", "5000")),
+        "APP_PORT": int(os.getenv("PORT", os.getenv("APP_PORT", "5000"))),
         "APP_DEBUG": _bool("APP_DEBUG"),
         "SENSOR_MODE": os.getenv("SENSOR_MODE", "mock"),
         "BOX_NODE_ID": os.getenv("BOX_NODE_ID", "BOX-DEMO-01"),
