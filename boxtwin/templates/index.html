@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TwinBoard | BoxTwin 3D</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header><div><span>HYDROGENI · BOXNODE</span><h1>TwinBoard</h1><p>{{ box_name }} · {{ node_id }}</p></div><b id="connection">Conectando…</b></header>
+  <main>
+    <section class="metrics">
+      <article><small>Volume estimado</small><strong id="volume">—</strong><span>m³</span></article>
+      <article><small>Ocupação</small><strong id="capacity">—</strong><span>%</span></article>
+      <article><small>Confiança</small><strong id="confidence">—</strong><span>%</span></article>
+      <article><small>Zonas válidas</small><strong id="zones">—</strong><span>/ 64</span></article>
+    </section>
+    <section class="workspace">
+      <article class="panel"><div class="panel-title"><h2>Superfície 8×8</h2><span id="updated">Sem leitura</span></div><div id="grid" class="grid"></div></article>
+      <aside class="panel"><h2>Alertas e controle</h2><div id="alerts" class="alerts"><p>Nenhum dado disponível.</p></div><button id="capture">Capturar agora</button><button id="calibrate" class="secondary">Calibrar box vazio</button></aside>
+    </section>
+  </main>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
+
