@@ -161,18 +161,24 @@ def history():
 
 @bp.get("/api/stream")
 def stream():
+    # Captura o runtime fora do gerador, evitando erro de contexto
+    rt = runtime()
+
     def events():
-        with current_app.app_context():   # <-- Adicione esta linha
-            last_id = None
-            while True:
-                reading = runtime().database.latest()
-                if reading and reading["id"] != last_id:
-                    last_id = reading["id"]
-                    yield f"event: reading\ndata: {json.dumps(reading)}\n\n"
-                else:
-                    yield ": keep-alive\n\n"
-                time.sleep(2)
-    return Response(events(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        last_id = None
+        while True:
+            reading = rt.database.latest()
+            if reading and reading["id"] != last_id:
+                last_id = reading["id"]
+                yield f"event: reading\ndata: {json.dumps(reading)}\n\n"
+            else:
+                yield ": keep-alive\n\n"
+            time.sleep(2)
+
+    return Response(events(), mimetype="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no"
+    })
 
 
 @bp.get("/api/admin/anomalies")
