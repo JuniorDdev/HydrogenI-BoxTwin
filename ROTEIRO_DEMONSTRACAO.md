@@ -2,7 +2,7 @@
 
 ## Preparação
 
-1. Execute `python app.py` e abra `http://127.0.0.1:5000`.
+1. Execute `python app.py`, apresente `http://127.0.0.1:5000` e abra o simulador pelo botão principal ou por `http://127.0.0.1:5000/simulador`.
 2. Clique em **Preparar demonstração**.
 3. Deixe aberta a visualização da pilha central.
 4. Teste previamente os cenários 50%, irregular, quase cheio e obstrução.
@@ -16,6 +16,7 @@
 5. **Alerta:** selecione quase cheio e mostre o alerta de capacidade.
 6. **Confiabilidade:** selecione obstrução e mostre a redução das zonas válidas.
 7. **Evolução:** informe que o sensor virtual será substituído pelo VL53L8CX sem alterar cálculo, banco ou painel.
+8. **Operação:** entre em `/admin`, mostre o assistente técnico, a fila de incidentes e baixe o relatório PDF.
 
 ## Frase de encerramento
 

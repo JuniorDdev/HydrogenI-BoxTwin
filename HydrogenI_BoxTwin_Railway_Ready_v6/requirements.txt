@@ -1,6 +1,0 @@
-Flask==3.1.1
-python-dotenv==1.1.1
-numpy==2.2.6
-pytest==8.4.1
-gunicorn>=23.0,<24.0
-reportlab>=4.4,<5.0

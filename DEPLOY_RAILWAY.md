@@ -54,6 +54,7 @@ Ative Grok, Twilio e e-mail separadamente somente depois de validar painel, logi
 ```text
 https://SEU-DOMINIO/api/health
 https://SEU-DOMINIO/
+https://SEU-DOMINIO/simulador
 https://SEU-DOMINIO/admin
 ```
 

@@ -27,7 +27,7 @@ Copy-Item .env.example .env
 python app.py
 ```
 
-Acesse `http://127.0.0.1:5000`. Na primeira abertura, o sistema calibra automaticamente o box vazio e apresenta uma pilha central.
+Acesse `http://127.0.0.1:5000`. A página principal apresenta o projeto. O simulador fica em `/simulador` e a central administrativa autenticada em `/admin`.
 
 Se o PowerShell bloquear a ativação do ambiente, execute uma vez:
 
@@ -98,6 +98,9 @@ O cálculo, banco, API, alertas e painel não precisarão ser reescritos.
 | POST | `/api/readings` | Captura nova leitura |
 | GET | `/api/readings/latest` | Retorna a leitura mais recente |
 | GET | `/api/readings/history` | Retorna histórico local |
+| GET | `/api/admin/summary` | Consolida indicadores do painel administrativo |
+| POST | `/api/admin/assistant` | Consulta o assistente técnico com contexto operacional |
+| GET | `/admin/reports/operational.pdf` | Gera relatório PDF de leituras e incidentes |
 
 ## Testes
 
@@ -126,6 +129,9 @@ Além do painel do gêmeo digital, esta versão inclui:
 - página detalhada de cada incidente, evidências e linha do tempo;
 - estados `aberta`, `ciente`, `em atendimento`, `resolvida` e `falso positivo`;
 - webhooks Twilio para status de entrega e respostas `1 ID`, `2 ID` ou `3 ID`.
+- landing page institucional em `/`, simulador independente em `/simulador` e painel real em `/admin`;
+- relatório operacional em PDF com indicadores, leituras recentes, incidentes e nota sobre o modo simulado;
+- atalhos de perguntas no assistente e contexto automático da última leitura e das anomalias ativas.
 
 No primeiro acesso local, use `admin` / `HydrogenI@2026` e altere ambos no `.env` antes de qualquer publicação. Para produção, use uma senha forte e uma `SECRET_KEY` aleatória. O RAG atual é deliberadamente local e baseado em recuperação; um provedor de LLM pode ser conectado depois sem mudar a interface administrativa.
 

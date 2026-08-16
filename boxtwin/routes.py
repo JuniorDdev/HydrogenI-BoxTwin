@@ -3,10 +3,14 @@ import time
 import base64
 import hashlib
 import hmac
+from datetime import datetime, timezone
 from functools import wraps
+from io import BytesIO
 
-from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, send_file, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
+
+from .reports import build_operational_report
 
 bp = Blueprint("main", __name__)
 
@@ -27,8 +31,13 @@ def admin_required(view):
 
 
 @bp.get("/")
-def dashboard():
+def landing():
     return render_template("index.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
+
+
+@bp.get("/simulador")
+def simulator():
+    return render_template("simulator.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -57,6 +66,50 @@ def logout():
 @admin_required
 def admin():
     return render_template("admin.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
+
+
+@bp.get("/api/admin/summary")
+@admin_required
+def admin_summary():
+    readings = runtime().database.history(100)
+    anomaly_items = runtime().database.anomalies(500)
+    active_statuses = {"open", "acknowledged", "in_progress"}
+    latest_reading = readings[-1] if readings else None
+    return jsonify({
+        "latest": latest_reading,
+        "readings_count": len(readings),
+        "active_incidents": sum(item["status"] in active_statuses for item in anomaly_items),
+        "resolved_incidents": sum(item["status"] == "resolved" for item in anomaly_items),
+        "average_confidence": round(sum(item["confidence_percent"] for item in readings) / len(readings), 1) if readings else None,
+        "sensor_mode": current_app.config["SENSOR_MODE"],
+    })
+
+
+@bp.get("/admin/reports/operational.pdf")
+@admin_required
+def operational_report():
+    try:
+        limit = max(10, min(int(request.args.get("limit", 50)), 100))
+    except ValueError:
+        limit = 50
+    readings = runtime().database.history(limit)
+    anomaly_items = runtime().database.anomalies(limit)
+    pdf_bytes = build_operational_report(
+        box_name=current_app.config["BOX_NAME"],
+        node_id=current_app.config["BOX_NODE_ID"],
+        sensor_mode=current_app.config["SENSOR_MODE"],
+        dimensions={
+            "length": runtime().volume.length_m,
+            "width": runtime().volume.width_m,
+            "height": runtime().volume.height_m,
+        },
+        readings=readings,
+        anomalies=anomaly_items,
+    )
+    filename = f"relatorio_boxtwin_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.pdf"
+    response = send_file(BytesIO(pdf_bytes), mimetype="application/pdf", as_attachment=True, download_name=filename)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @bp.get("/admin/anomalies/<int:anomaly_id>")
@@ -190,7 +243,18 @@ def assistant():
     question = str(payload.get("question", "")).strip()
     if not question:
         return jsonify({"error": "Informe uma pergunta."}), 400
-    return jsonify(runtime().assistant.answer(question, payload.get("context")))
+    if len(question) > 1200:
+        return jsonify({"error": "A pergunta deve ter no máximo 1.200 caracteres."}), 400
+    context = payload.get("context")
+    if context is None:
+        latest_reading = runtime().database.latest()
+        if latest_reading:
+            latest_reading = {key: value for key, value in latest_reading.items() if key != "height_grid_m"}
+        context = {
+            "latest_reading": latest_reading,
+            "active_anomalies": runtime().database.anomalies(10, "open"),
+        }
+    return jsonify(runtime().assistant.answer(question, context))
 
 
 def valid_twilio_signature():

@@ -37,6 +37,31 @@ def test_admin_login_and_rag(tmp_path):
     assert data["sources"]
 
 
+def test_public_landing_and_simulator_are_separate(tmp_path):
+    client = make_client(tmp_path)
+    landing = client.get("/")
+    simulator = client.get("/simulador")
+    assert landing.status_code == 200
+    assert b"Transforme uma pilha irregular" in landing.data
+    assert simulator.status_code == 200
+    assert b"AMBIENTE SIMULADO" in simulator.data
+
+
+def test_admin_summary_and_pdf_report(tmp_path):
+    client = make_client(tmp_path)
+    login(client)
+    client.post("/api/demo/setup")
+    client.post("/api/demo/scenario/flat_50")
+    summary = client.get("/api/admin/summary")
+    assert summary.status_code == 200
+    assert summary.get_json()["latest"]["capacity_percent"] > 0
+    report = client.get("/admin/reports/operational.pdf")
+    assert report.status_code == 200
+    assert report.mimetype == "application/pdf"
+    assert report.data.startswith(b"%PDF")
+    assert len(report.data) > 3000
+
+
 def test_anomaly_workflow(tmp_path):
     client = make_client(tmp_path)
     login(client)

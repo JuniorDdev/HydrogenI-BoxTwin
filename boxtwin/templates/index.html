@@ -3,67 +3,80 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#071526">
-  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#061426">
+  <meta name="description" content="HydrogenI BoxTwin 3D: medição inteligente de volume, gêmeo digital e gestão de anomalias para boxes de granéis.">
   <title>HydrogenI | BoxTwin 3D</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="brand-mark">H</div>
-      <div><span>HYDROGENI · BOXNODE</span><h1>BoxTwin 3D</h1><p>{{ box_name }} · {{ node_id }}</p></div>
+<body class="landing-page">
+  <nav class="landing-nav" aria-label="Navegação principal">
+    <a class="landing-brand" href="/" aria-label="HydrogenI - início"><span>H</span><div><b>HYDROGENI</b><small>BOXTWIN 3D</small></div></a>
+    <button id="menuToggle" class="menu-toggle" aria-label="Abrir menu" aria-expanded="false">Menu</button>
+    <div id="landingMenu" class="landing-menu">
+      <a href="#solucao">Solução</a><a href="#como-funciona">Como funciona</a><a href="#recursos">Recursos</a>
+      <a class="nav-secondary" href="/login">Painel administrativo</a><a class="nav-primary" href="/simulador">Abrir simulador</a>
     </div>
-    <div class="status-group"><a href="/admin" class="badge">ÁREA ADMIN</a><b id="modeBadge" class="badge demo">MODO DEMONSTRAÇÃO</b><b id="connection" class="badge">Conectando…</b></div>
-  </header>
+  </nav>
 
-  <main>
-    <section class="hero">
-      <div><span class="eyebrow">GÊMEO DIGITAL PARA GRANÉIS</span><h2>Volume do box em tempo real</h2><p>Protótipo demonstrável com matriz virtual 8×8. A mesma interface receberá as leituras do VL53L8CX quando o hardware estiver disponível.</p></div>
-      <div class="box-spec"><span>Capacidade cadastrada</span><strong id="boxCapacity">—</strong><small id="boxDimensions">Carregando dimensões…</small></div>
+  <main class="landing-main">
+    <section class="landing-hero">
+      <div class="landing-copy reveal">
+        <span class="landing-kicker"><i></i> Gêmeo digital para granéis</span>
+        <h1>Transforme uma pilha irregular em uma <em>medição confiável.</em></h1>
+        <p>O BoxTwin 3D converte dados de profundidade em volume, ocupação e alertas operacionais - com histórico rastreável, assistente técnico e funcionamento local.</p>
+        <div class="hero-actions"><a class="cta-primary" href="/simulador">Explorar demonstração <span>→</span></a><a class="cta-secondary" href="/login">Acessar operação</a></div>
+        <div class="proof-row"><span>64 zonas de leitura</span><span>Operação offline</span><span>Alertas em tempo real</span></div>
+      </div>
+      <div class="product-stage reveal" aria-label="Prévia do painel BoxTwin">
+        <div class="stage-glow"></div>
+        <article class="product-window">
+          <header><div><i></i><b>{{ node_id }}</b></div><span id="landingStatus">Conectando</span></header>
+          <div class="preview-metrics"><div><small>Ocupação</small><strong id="landingOccupancy">--%</strong></div><div><small>Confiança</small><strong id="landingConfidence">--%</strong></div><div><small>Volume</small><strong id="landingVolume">-- m³</strong></div></div>
+          <div class="preview-body"><div><span>SUPERFÍCIE 8 x 8</span><div id="landingGrid" class="preview-grid"></div></div><aside><span>BOX DIGITAL</span><div class="wire-box"><i></i><i></i><i></i></div><p id="landingReadingState">Aguardando leitura do BoxNode.</p></aside></div>
+          <footer><span><i></i> Telemetria ativa</span><small>{{ box_name }}</small></footer>
+        </article>
+      </div>
     </section>
 
-    <section class="metrics">
-      <article><small>Volume estimado</small><div><strong id="volume">—</strong><span>m³</span></div><em>Integração das 64 zonas</em></article>
-      <article><small>Ocupação</small><div><strong id="capacity">—</strong><span>%</span></div><div class="meter"><i id="capacityBar"></i></div></article>
-      <article><small>Altura média</small><div><strong id="avgHeight">—</strong><span>cm</span></div><em id="maxHeight">Pico: —</em></article>
-      <article><small>Confiança</small><div><strong id="confidence">—</strong><span>%</span></div><em><span id="zones">—</span> de 64 zonas válidas</em></article>
-      <article><small>Erro da simulação</small><div><strong id="referenceError">—</strong><span>p.p.</span></div><em id="referenceValue">Referência: —</em></article>
+    <section id="solucao" class="landing-section problem-section reveal">
+      <div class="section-intro"><span class="landing-kicker">O desafio</span><h2>Medir granéis não deveria depender apenas de estimativa visual.</h2></div>
+      <div class="problem-grid">
+        <article><span>01</span><h3>Superfície irregular</h3><p>Pilhas, inclinações e vazios tornam a avaliação manual imprecisa.</p></article>
+        <article><span>02</span><h3>Baixa rastreabilidade</h3><p>Sem histórico estruturado, variações e incidentes ficam difíceis de comprovar.</p></article>
+        <article class="solution-card"><span>SOLUÇÃO</span><h3>Um box que entende seu próprio volume.</h3><p>A matriz de profundidade alimenta um gêmeo digital e transforma 64 pontos em informação operacional.</p></article>
+      </div>
     </section>
 
-    <section id="demoPanel" class="demo-panel panel">
-      <div class="panel-heading"><div><span class="eyebrow">CONTROLE DO MVP</span><h3>Cenários de demonstração</h3></div><button id="setup" class="primary compact">Preparar demonstração</button></div>
-      <p>Selecione um cenário para simular a superfície do fertilizante e gerar uma nova medição imediatamente.</p>
-      <div id="scenarios" class="scenario-list"></div>
+    <section id="como-funciona" class="landing-section flow-section reveal">
+      <div class="section-intro centered"><span class="landing-kicker">Fluxo de dados</span><h2>Da leitura à decisão, em quatro etapas.</h2></div>
+      <div class="flow-grid">
+        <article><b>1</b><div class="flow-icon sensor-icon"></div><h3>Captura</h3><p>O sensor registra uma matriz de profundidade com 64 zonas.</p></article>
+        <article><b>2</b><div class="flow-icon calc-icon"></div><h3>Cálculo</h3><p>A calibração vazia é comparada à superfície atual do material.</p></article>
+        <article><b>3</b><div class="flow-icon twin-icon"></div><h3>Gêmeo digital</h3><p>Volume, ocupação, alturas e confiança são atualizados no painel.</p></article>
+        <article><b>4</b><div class="flow-icon alert-icon"></div><h3>Ação</h3><p>Anomalias geram tratativas, notificações e registro operacional.</p></article>
+      </div>
     </section>
 
-    <section class="workspace">
-      <article class="panel twin-panel">
-        <div class="panel-heading"><div><span class="eyebrow">VISTA TRIDIMENSIONAL</span><h3>Gêmeo digital do box</h3></div><span id="updated" class="muted">Sem leitura</span></div>
-        <canvas id="twinCanvas" aria-label="Representação tridimensional da carga"></canvas>
-        <div class="legend"><span>Baixo</span><i></i><span>Alto</span></div>
-      </article>
-
-      <article class="panel map-panel">
-        <div class="panel-heading"><div><span class="eyebrow">MAPA DE ALTURA</span><h3>Superfície 8×8</h3></div><span class="unit">cm</span></div>
-        <div id="grid" class="grid"></div>
-      </article>
-
-      <aside class="panel control-panel">
-        <div><span class="eyebrow">DIAGNÓSTICO</span><h3>Estado operacional</h3></div>
-        <div id="alerts" class="alerts"><p>Nenhum dado disponível.</p></div>
-        <button id="capture" class="primary">Capturar novamente</button>
-        <button id="calibrate" class="secondary">Calibrar box vazio</button>
-      </aside>
+    <section id="recursos" class="landing-section capabilities-section reveal">
+      <div class="section-intro"><span class="landing-kicker">Plataforma operacional</span><h2>Um MVP organizado para demonstrar hoje e evoluir amanhã.</h2><p>A arquitetura separa experiência pública, ambiente simulado e gestão administrativa.</p></div>
+      <div class="capability-grid">
+        <article class="capability-feature"><span class="capability-number">01</span><h3>Visualização 3D</h3><p>Mapa de altura e superfície tridimensional gerados diretamente no navegador.</p><div class="mini-surface"><i></i><i></i><i></i><i></i><i></i></div></article>
+        <article><span class="capability-number">02</span><h3>Assistente técnico</h3><p>Consulta procedimentos internos por RAG local, com possibilidade de Grok e fontes rastreáveis.</p></article>
+        <article><span class="capability-number">03</span><h3>Relatório PDF</h3><p>Consolida indicadores, leituras e incidentes em um documento pronto para apresentação.</p></article>
+        <article><span class="capability-number">04</span><h3>Gestão de incidentes</h3><p>Fila, ciência, atendimento, resolução, evidências e linha do tempo.</p></article>
+        <article><span class="capability-number">05</span><h3>Integrações</h3><p>Notificações opcionais por e-mail e Twilio sem interromper o ciclo de medição.</p></article>
+      </div>
     </section>
 
-    <section class="panel history-panel">
-      <div class="panel-heading"><div><span class="eyebrow">HISTÓRICO LOCAL</span><h3>Evolução da ocupação</h3></div><span class="muted">Últimas 20 leituras</span></div>
-      <canvas id="historyCanvas" aria-label="Histórico de ocupação"></canvas>
+    <section class="landing-section architecture-callout reveal">
+      <div><span class="landing-kicker">Arquitetura evolutiva</span><h2>O simulador usa o mesmo contrato de dados do sensor.</h2><p>Trocar o modo virtual pelo hardware não exige reconstruir cálculo, banco de dados, APIs ou painel.</p></div>
+      <div class="architecture-flow"><span>Sensor 8 x 8</span><i>→</i><span>Motor volumétrico</span><i>→</i><span>BoxTwin + alertas</span></div>
     </section>
 
-    <footer><span>HydrogenI · BoxTwin 3D</span><p>MVP para medição automatizada de volume em boxes de fertilizantes.</p></footer>
+    <section class="landing-cta reveal"><span>HYDROGENI · BOXTWIN 3D</span><h2>Veja o gêmeo digital em funcionamento.</h2><p>Explore cenários conhecidos, gere leituras e acompanhe o fluxo completo do MVP.</p><div class="hero-actions"><a class="cta-primary" href="/simulador">Iniciar simulação <span>→</span></a><a class="cta-secondary light" href="/login">Entrar no painel</a></div></section>
   </main>
-  <script src="{{ url_for('static', filename='app.js') }}"></script>
+
+  <footer class="landing-footer"><a class="landing-brand" href="/"><span>H</span><div><b>HYDROGENI</b><small>BOXTWIN 3D</small></div></a><p>Medição automatizada de volume e gestão inteligente de boxes.</p><small>Projeto HydrogenI · 2026</small></footer>
+  <script src="{{ url_for('static', filename='landing.js') }}"></script>
 </body>
 </html>
