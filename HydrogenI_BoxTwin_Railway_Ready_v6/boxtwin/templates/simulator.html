@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#071526">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <title>Simulador | HydrogenI BoxTwin 3D</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><div class="brand-mark">H</div><div><span>HYDROGENI · BOXNODE</span><h1>BoxTwin 3D</h1><p>{{ box_name }} · {{ node_id }}</p></div></a>
+    <div class="status-group"><a href="/" class="badge">PROJETO</a><a href="/admin" class="badge">ÁREA ADMIN</a><b id="modeBadge" class="badge demo">MODO DEMONSTRAÇÃO</b><b id="connection" class="badge">Conectando…</b></div>
+  </header>
+  <main>
+    <section class="hero"><div><span class="eyebrow">AMBIENTE SIMULADO</span><h2>Volume do box em tempo real</h2><p>Protótipo demonstrável com matriz virtual 8 x 8. A mesma interface receberá as leituras do sensor físico quando o hardware estiver disponível.</p></div><div class="box-spec"><span>Capacidade cadastrada</span><strong id="boxCapacity">-</strong><small id="boxDimensions">Carregando dimensões...</small></div></section>
+    <section class="metrics">
+      <article><small>Volume estimado</small><div><strong id="volume">-</strong><span>m³</span></div><em>Integração das 64 zonas</em></article>
+      <article><small>Ocupação</small><div><strong id="capacity">-</strong><span>%</span></div><div class="meter"><i id="capacityBar"></i></div></article>
+      <article><small>Altura média</small><div><strong id="avgHeight">-</strong><span>cm</span></div><em id="maxHeight">Pico: -</em></article>
+      <article><small>Confiança</small><div><strong id="confidence">-</strong><span>%</span></div><em><span id="zones">-</span> de 64 zonas válidas</em></article>
+      <article><small>Erro da simulação</small><div><strong id="referenceError">-</strong><span>p.p.</span></div><em id="referenceValue">Referência: -</em></article>
+    </section>
+    <section id="demoPanel" class="demo-panel panel"><div class="panel-heading"><div><span class="eyebrow">CONTROLE DO MVP</span><h3>Cenários de demonstração</h3></div><button id="setup" class="primary compact">Preparar demonstração</button></div><p>Selecione um cenário para simular a superfície do fertilizante e gerar uma nova medição imediatamente.</p><div id="scenarios" class="scenario-list"></div></section>
+    <section class="workspace">
+      <article class="panel twin-panel"><div class="panel-heading"><div><span class="eyebrow">VISTA TRIDIMENSIONAL</span><h3>Gêmeo digital do box</h3></div><span id="updated" class="muted">Sem leitura</span></div><canvas id="twinCanvas" aria-label="Representação tridimensional da carga"></canvas><div class="legend"><span>Baixo</span><i></i><span>Alto</span></div></article>
+      <article class="panel map-panel"><div class="panel-heading"><div><span class="eyebrow">MAPA DE ALTURA</span><h3>Superfície 8 x 8</h3></div><span class="unit">cm</span></div><div id="grid" class="grid"></div></article>
+      <aside class="panel control-panel"><div><span class="eyebrow">DIAGNÓSTICO</span><h3>Estado operacional</h3></div><div id="alerts" class="alerts"><p>Nenhum dado disponível.</p></div><button id="capture" class="primary">Capturar novamente</button><button id="calibrate" class="secondary">Calibrar box vazio</button></aside>
+    </section>
+    <section class="panel history-panel"><div class="panel-heading"><div><span class="eyebrow">HISTÓRICO LOCAL</span><h3>Evolução da ocupação</h3></div><span class="muted">Últimas 20 leituras</span></div><canvas id="historyCanvas" aria-label="Histórico de ocupação"></canvas></section>
+    <footer><span>HydrogenI · BoxTwin 3D</span><p>Ambiente simulado do MVP para medição automatizada de volume.</p></footer>
+  </main>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

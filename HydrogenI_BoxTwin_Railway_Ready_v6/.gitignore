@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.*
+!.env.example
+data/*.db
+data/calibration.json
+*.log
+.DS_Store
+Thumbs.db
+*.zip
