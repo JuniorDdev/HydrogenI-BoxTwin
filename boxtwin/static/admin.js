@@ -52,7 +52,10 @@ async function loadAdmin() {
     renderAnomalies(anomalies);
     $('notificationList').innerHTML = notifications.length ? notifications.map(item => `<div class="notification-row"><b>${escapeHtml(item.channel)}</b><span>${escapeHtml(item.delivery_status || item.status)}</span><small>${localDate(item.created_at)}</small></div>`).join('') : '<p class="muted">Nenhuma notificação enviada. Os canais externos permanecem opcionais.</p>';
     $('recipientList').innerHTML = recipients.map(item => `<div class="list-row"><b>${escapeHtml(item.name)}</b><span>${escapeHtml(item.team_name || item.recipient_type)}</span><small>${escapeHtml(item.email || item.phone)}</small></div>`).join('') || '<p class="muted">Cadastre o primeiro responsável.</p>';
-    $('ruleRecipient').innerHTML = recipients.filter(item => item.active).map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
+    const activeRecipients = recipients.filter(item => item.active);
+    $('ruleRecipient').innerHTML = activeRecipients.map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
+    $('ruleRecipientWarning').hidden = activeRecipients.length > 0;
+    $('ruleForm').querySelector('button').disabled = activeRecipients.length === 0;
     $('ruleList').innerHTML = rules.map(item => `<div class="list-row"><b>${escapeHtml(typeLabels[item.anomaly_type] || item.anomaly_type)} → ${escapeHtml(item.recipient_name)}</b><span>${escapeHtml(item.channel)}</span><small>${item.escalation_minutes ? `Após ${item.escalation_minutes} min` : 'Imediata'}</small></div>`).join('') || '<p class="muted">Nenhuma regra cadastrada.</p>';
     $('adminConnection').textContent = 'Online';
   } catch (error) {
@@ -102,14 +105,28 @@ document.querySelectorAll('.quick-prompt').forEach(button => button.addEventList
 $('refreshAdmin').addEventListener('click', loadAdmin);
 $('recipientForm').addEventListener('submit', async event => {
   event.preventDefault();
-  await api('/api/admin/recipients', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:$('recipientName').value, recipient_type:$('recipientType').value, team_name:$('recipientTeam').value, email:$('recipientEmail').value, phone:$('recipientPhone').value})});
-  event.target.reset();
-  await loadAdmin();
+  try {
+    await api('/api/admin/recipients', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:$('recipientName').value, recipient_type:$('recipientType').value, team_name:$('recipientTeam').value, email:$('recipientEmail').value, phone:$('recipientPhone').value})});
+    event.target.reset();
+    showToast('Responsável cadastrado com sucesso.', 'success');
+    await loadAdmin();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
 });
 $('ruleForm').addEventListener('submit', async event => {
   event.preventDefault();
-  await api('/api/admin/rules', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({anomaly_type:$('ruleType').value, severity:$('ruleSeverity').value, recipient_id:$('ruleRecipient').value, channel:$('ruleChannel').value, escalation_minutes:$('ruleDelay').value})});
-  await loadAdmin();
+  if (!$('ruleRecipient').value) {
+    showToast('Cadastre um responsável ativo antes de criar uma regra.', 'error');
+    return;
+  }
+  try {
+    await api('/api/admin/rules', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({anomaly_type:$('ruleType').value, severity:$('ruleSeverity').value, recipient_id:$('ruleRecipient').value, channel:$('ruleChannel').value, escalation_minutes:$('ruleDelay').value})});
+    showToast('Regra de automação criada com sucesso.', 'success');
+    await loadAdmin();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
 });
 
 const stream = new EventSource('/api/stream');

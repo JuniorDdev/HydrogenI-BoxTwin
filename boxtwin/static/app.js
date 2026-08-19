@@ -46,7 +46,9 @@ function drawTwin(grid) {
   ctx.clearRect(0, 0, width, height);
   const maxValue = Math.max(...grid.flat(), .001);
   const centerX = width * .50, originY = height * .76;
-  const scaleX = Math.min(width / 19, 31), scaleY = scaleX * .48, scaleZ = height * 1.22;
+  const scaleX = Math.min(width / 19, 31), scaleY = scaleX * .48;
+  const boxHeight = Math.max(state.health?.dimensions_m?.height || .5, maxValue, .001);
+  const scaleZ = Math.min(height * .5, originY - 18) / boxHeight;
   const project = (row, col, z = 0) => ({
     x: centerX + (col - row) * scaleX,
     y: originY + (col + row - 7) * scaleY - z * scaleZ
@@ -147,7 +149,7 @@ async function loadHistory() {
 async function chooseScenario(id, button) {
   const buttons = document.querySelectorAll('.scenario'); buttons.forEach(item => item.disabled = true);
   try { render(await request(`/api/demo/scenario/${id}`, {method:'POST'})); await loadHistory(); }
-  catch (error) { alert(error.message); }
+  catch (error) { showToast(error.message, 'error'); }
   finally { buttons.forEach(item => item.disabled = false); }
 }
 
@@ -189,14 +191,17 @@ async function initialize() {
 }
 
 $('setup').onclick = async () => { const data=await request('/api/demo/setup',{method:'POST'});render(data.reading);await loadHistory(); };
-$('capture').onclick = async () => { try{render(await request('/api/readings',{method:'POST'}));await loadHistory();}catch(error){alert(error.message);} };
-$('calibrate').onclick = async () => {
-  if (!confirm('A calibração definirá o box como vazio. Deseja continuar?')) return;
+$('capture').onclick = async () => { try{render(await request('/api/readings',{method:'POST'}));await loadHistory();}catch(error){showToast(error.message,'error');} };
+
+async function performCalibration() {
   try {
     if (state.health.demo_enabled) render(await request('/api/demo/scenario/empty',{method:'POST'}));
-    else { await request('/api/calibration',{method:'POST'}); alert('Calibração salva.'); }
+    else { await request('/api/calibration',{method:'POST'}); showToast('Calibração salva.','success'); }
     await loadHistory();
-  } catch(error){alert(error.message);}
+  } catch (error) { showToast(error.message,'error'); }
+}
+$('calibrate').onclick = () => {
+  showConfirmToast('A calibração definirá o box como vazio. Deseja continuar?', performCalibration, {confirmLabel:'Calibrar', cancelLabel:'Cancelar'});
 };
 window.addEventListener('resize',()=>{if(state.latest)drawTwin(state.latest.height_grid_m);loadHistory().catch(()=>{});});
 initialize();
