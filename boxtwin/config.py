@@ -48,4 +48,8 @@ def load_config():
         "TWILIO_VALIDATE_SIGNATURE": _bool("TWILIO_VALIDATE_SIGNATURE", True),
         "DATABASE_PATH": str(root / os.getenv("DATABASE_PATH", "data/boxtwin.db")),
         "CALIBRATION_PATH": str(root / os.getenv("CALIBRATION_PATH", "data/calibration.json")),
+        "SSL_CERT_PATH": os.getenv("SSL_CERT_PATH", ""),
+        "SSL_KEY_PATH": os.getenv("SSL_KEY_PATH", ""),
+        "SSL_AUTO_GENERATE": _bool("SSL_AUTO_GENERATE", False),
+        "OFFLINE_QUEUE_PATH": str(root / os.getenv("OFFLINE_QUEUE_PATH", "data/offline_queue.json")),
     }

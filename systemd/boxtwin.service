@@ -14,3 +14,4 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 
+ExecStart=/home/pi/HydrogenI-BoxTwin/.venv/bin/gunicorn --bind 0.0.0.0:5000 --certfile=/home/pi/HydrogenI-BoxTwin/cert.pem --keyfile=/home/pi/HydrogenI-BoxTwin/key.pem --workers 1 --threads 8 --timeout 120 app:app
