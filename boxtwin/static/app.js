@@ -7,15 +7,12 @@ let lastSoundAlertId = null;
 let reminderIntervalId = null;
 let lastReminderAlertId = null;
 
-<<<<<<< HEAD
-=======
 const viewState = {
   rotationY: Math.PI / 4,
   rotationX: 0.48,
   zoom: 1,
 };
 
->>>>>>> 62ebd29 (feat: alertas, relatórios, sync edge-railway e preparo raspberry)
 function fmt(value, digits = 1) {
   return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '—';
 }
@@ -118,13 +115,6 @@ function drawTwin(grid) {
   ctx.clearRect(0, 0, width, height);
   const maxValue = Math.max(...grid.flat(), .001);
   const centerX = width * .50, originY = height * .76;
-<<<<<<< HEAD
-  const scaleX = Math.min(width / 19, 31), scaleY = scaleX * .48, scaleZ = height * 1.22;
-  const project = (row, col, z = 0) => ({
-    x: centerX + (col - row) * scaleX,
-    y: originY + (col + row - 7) * scaleY - z * scaleZ
-  });
-=======
   const scaleX = Math.min(width / 19, 31) * viewState.zoom;
   const scaleY = scaleX * viewState.rotationX;
   const boxHeight = Math.max(state.health?.dimensions_m?.height || .5, maxValue, .001);
@@ -140,7 +130,6 @@ function drawTwin(grid) {
       y: originY + (u * sinYaw + v * cosYaw) * scaleY - z * scaleZ,
     };
   };
->>>>>>> 62ebd29 (feat: alertas, relatórios, sync edge-railway e preparo raspberry)
 
   ctx.strokeStyle = '#78b8df55';
   ctx.lineWidth = 1;
@@ -337,13 +326,6 @@ async function loadHistory() {
   drawHistory(items);
 }
 
-<<<<<<< HEAD
-async function chooseScenario(id, button) {
-  const buttons = document.querySelectorAll('.scenario'); buttons.forEach(item => item.disabled = true);
-  try { render(await request(`/api/demo/scenario/${id}`, {method:'POST'})); await loadHistory(); }
-  catch (error) { alert(error.message); }
-  finally { buttons.forEach(item => item.disabled = false); }
-=======
 async function loadActiveAlerts() {
   const payload = await request('/api/alerts/active?limit=10');
   state.activeAlerts = payload.items || [];
@@ -361,7 +343,6 @@ async function chooseScenario(id) {
   } finally {
     buttons.forEach(item => item.disabled = false);
   }
->>>>>>> 62ebd29 (feat: alertas, relatórios, sync edge-railway e preparo raspberry)
 }
 
 async function loadScenarios() {
@@ -423,19 +404,6 @@ async function initialize() {
   }
 }
 
-<<<<<<< HEAD
-$('setup').onclick = async () => { const data=await request('/api/demo/setup',{method:'POST'});render(data.reading);await loadHistory(); };
-$('capture').onclick = async () => { try{render(await request('/api/readings',{method:'POST'}));await loadHistory();}catch(error){alert(error.message);} };
-$('calibrate').onclick = async () => {
-  if (!confirm('A calibração definirá o box como vazio. Deseja continuar?')) return;
-  try {
-    if (state.health.demo_enabled) render(await request('/api/demo/scenario/empty',{method:'POST'}));
-    else { await request('/api/calibration',{method:'POST'}); alert('Calibração salva.'); }
-    await loadHistory();
-  } catch(error){alert(error.message);}
-};
-window.addEventListener('resize',()=>{if(state.latest)drawTwin(state.latest.height_grid_m);loadHistory().catch(()=>{});});
-=======
 $('setup').onclick = async () => {
   const data=await request('/api/demo/setup',{method:'POST'});
   render(data.reading);
@@ -473,5 +441,4 @@ window.addEventListener('resize', () => {
   loadHistory().catch(()=>{});
 });
 
->>>>>>> 62ebd29 (feat: alertas, relatórios, sync edge-railway e preparo raspberry)
 initialize();

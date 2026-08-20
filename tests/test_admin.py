@@ -13,6 +13,7 @@ def make_client(tmp_path):
         "EMAIL_ENABLED": False,
         "TWILIO_ENABLED": False,
         "TWILIO_VALIDATE_SIGNATURE": False,
+        "GROQ_ENABLED": False,
     })
     return app.test_client()
 
