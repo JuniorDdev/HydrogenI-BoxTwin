@@ -86,9 +86,18 @@ class NotificationService:
             self.last_sent[key] = now
             rules = self.database.matching_rules(anomaly)
             targets = rules or self._legacy_targets()
+            sent_targets = set()
             for target in targets:
                 if int(target.get("escalation_minutes", 0)) > 0:
                     continue  # processado pelo escalonador periódico
+                target_key = (
+                    target.get("channel"),
+                    target.get("email") or self.config["ALERT_EMAIL_TO"],
+                    target.get("phone") or self.config["TWILIO_TO"],
+                )
+                if target_key in sent_targets:
+                    continue
+                sent_targets.add(target_key)
                 result = self._send(anomaly, target)
                 if result:
                     results.append(result)
@@ -107,6 +116,12 @@ class NotificationService:
             status, detail = "sent", f"Notificação enviada para {target.get('recipient_name', 'destinatário')}"
         except Exception as exc:
             status, detail, provider_id = "failed", str(exc)[:300], None
+        safe_recipient = target.get("recipient_name") or "destinatário configurado"
+        print(
+            f"[BoxTwin][Notification] channel={channel} status={status} "
+            f"recipient={safe_recipient!r} detail={detail}",
+            flush=True,
+        )
         self.database.log_notification(anomaly["id"], channel, status, detail, provider_id, target.get("recipient_id"))
         return {"anomaly_id": anomaly["id"], "channel": channel, "status": status}
 

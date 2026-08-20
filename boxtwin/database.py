@@ -315,9 +315,23 @@ class Database:
 
     def save_rule(self, payload):
         with self.connect() as connection:
+            values = (
+                payload["anomaly_type"], payload.get("severity", "*"),
+                int(payload["recipient_id"]), payload["channel"],
+                max(0, int(payload.get("escalation_minutes", 0))),
+            )
+            existing = connection.execute(
+                """SELECT id FROM notification_rules
+                   WHERE anomaly_type=? AND severity=? AND recipient_id=?
+                     AND channel=? AND escalation_minutes=? AND active=1
+                   ORDER BY id LIMIT 1""",
+                values,
+            ).fetchone()
+            if existing:
+                return existing["id"]
             cursor = connection.execute(
                 "INSERT INTO notification_rules (anomaly_type, severity, recipient_id, channel, escalation_minutes, active) VALUES (?, ?, ?, ?, ?, ?)",
-                (payload["anomaly_type"], payload.get("severity", "*"), int(payload["recipient_id"]), payload["channel"], max(0, int(payload.get("escalation_minutes", 0))), int(payload.get("active", True))),
+                (*values, int(payload.get("active", True))),
             )
             return cursor.lastrowid
 

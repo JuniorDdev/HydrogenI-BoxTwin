@@ -174,7 +174,16 @@ async function loadAdmin() {
     renderSummary(summary);
     renderAnomalies(enrichedAnomalies);
     renderActiveAlertSignal(activeAlerts.items);
-    $('notificationList').innerHTML = notifications.length ? notifications.map(item => `<div class="notification-row"><b>${escapeHtml(item.channel)}</b><span>${escapeHtml(item.delivery_status || item.status)}</span><small>${localDate(item.created_at)}</small></div>`).join('') : '<p class="muted">Nenhuma notificação enviada. Os canais externos permanecem opcionais.</p>';
+    $('notificationList').innerHTML = notifications.length ? notifications.map(item => {
+      const state = item.delivery_status || item.status;
+      const stateLabel = state === 'sent' ? 'Enviado' : state === 'failed' ? 'Falhou' : state;
+      return `<div class="notification-row ${state === 'failed' ? 'notification-failed' : ''}">
+        <b>${escapeHtml(item.channel)}</b>
+        <span>${escapeHtml(stateLabel)}</span>
+        <small>${localDate(item.created_at)}</small>
+        <em>${escapeHtml(item.detail || 'O provedor não informou detalhes.')}</em>
+      </div>`;
+    }).join('') : '<p class="muted">Nenhuma notificação enviada. Os canais externos permanecem opcionais.</p>';
     $('recipientList').innerHTML = recipients.map(item => `<div class="list-row"><b>${escapeHtml(item.name)}</b><span>${escapeHtml(item.team_name || item.recipient_type)}</span><small>${escapeHtml(item.email || item.phone)}</small></div>`).join('') || '<p class="muted">Cadastre o primeiro responsável.</p>';
     const activeRecipients = recipients.filter(item => item.active);
     $('ruleRecipient').innerHTML = activeRecipients.map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
