@@ -354,7 +354,7 @@ def valid_edge_token():
 @bp.post("/api/webhooks/twilio/status")
 def twilio_status():
     if not valid_twilio_signature():
-        return "Invalid signature", 403
+        return "Assinatura inválida.", 403
     sid, status = request.form.get("MessageSid", ""), request.form.get("MessageStatus", "")
     runtime().database.update_delivery_status(sid, status, request.form.get("ErrorMessage", ""))
     return "", 204
@@ -363,7 +363,10 @@ def twilio_status():
 @bp.post("/api/webhooks/twilio/incoming")
 def twilio_incoming():
     if not valid_twilio_signature():
-        return "Invalid signature", 403
+        return "Assinatura inválida.", 403
+    # Status internos ficam em inglês no banco (compatibilidade com o resto do sistema); a mensagem
+    # de confirmação enviada por WhatsApp/SMS precisa aparecer sempre em português para o operador.
+    status_labels_pt = {"acknowledged": "ciente", "in_progress": "em atendimento", "resolved": "tratado"}
     parts = request.form.get("Body", "").strip().split()
     action = {"1": "acknowledged", "2": "in_progress", "3": "resolved"}.get(parts[0] if parts else "")
     if not action or len(parts) < 2 or not parts[1].isdigit():
@@ -372,7 +375,8 @@ def twilio_incoming():
         anomaly_id = int(parts[1])
         sender = request.form.get("From", "Responsável via Twilio")
         found = runtime().database.update_anomaly_status(anomaly_id, action, "Atualização recebida pelo WhatsApp/SMS.", sender)
-        reply = f"BoxTwin #{anomaly_id} atualizado para {action}." if found else "Anomalia não encontrada."
+        status_pt = status_labels_pt.get(action, action)
+        reply = f"BoxTwin #{anomaly_id} atualizado para {status_pt}." if found else "Anomalia não encontrada."
     escaped = reply.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     return f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>{escaped}</Message></Response>', 200, {"Content-Type": "application/xml"}
 
