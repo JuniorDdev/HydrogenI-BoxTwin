@@ -26,10 +26,17 @@
       <article><small>Incidentes resolvidos</small><div><strong id="adminResolved">-</strong></div><em>Histórico operacional</em></article>
       <article><small>Modo do sensor</small><div><strong id="adminSensorMode">-</strong></div><em id="adminReadingTime">Aguardando telemetria</em></article>
     </section>
+    <section id="adminAlertBanner" class="panel alert-signal" hidden>
+      <div class="panel-heading">
+        <div><span class="eyebrow">ALERTA AO CLIENTE</span><h3 id="adminAlertTitle">Tratativa pendente</h3></div>
+        <span id="adminAlertMeta" class="alert-signal-meta">Sem incidentes ativos</span>
+      </div>
+      <p id="adminAlertText" class="alert-signal-text">Nenhum alerta operacional aguardando intervenção humana.</p>
+    </section>
 
     <section class="admin-grid">
       <article class="panel">
-        <div class="panel-heading"><div><span class="eyebrow">FILA OPERACIONAL</span><h3>Anomalias recentes</h3></div><div class="admin-actions"><a class="report-link" href="/admin/reports/operational.pdf">Baixar relatório PDF</a><button id="refreshAdmin" class="secondary compact">Atualizar</button></div></div>
+        <div class="panel-heading"><div><span class="eyebrow">FILA OPERACIONAL</span><h3>Anomalias que ainda exigem ação</h3></div><div class="admin-actions"><a class="report-link" href="/admin/reports">Página de relatórios</a><button id="refreshAdmin" class="secondary compact">Atualizar</button></div></div>
         <div id="anomalyList" class="incident-list"></div>
       </article>
       <aside class="panel assistant-panel">
@@ -47,6 +54,44 @@
     <section class="panel"><div class="panel-heading"><div><span class="eyebrow">CANAIS EXTERNOS</span><h3>Histórico de notificações</h3></div></div><div id="notificationList" class="notification-list"></div></section>
     <footer><span>HydrogenI · BoxTwin 3D</span><p>Painel administrativo e operacional do BoxNode.</p></footer>
   </main>
+<<<<<<< HEAD
+=======
+
+  <div id="interventionModal" class="intervention-modal" hidden>
+    <div class="intervention-card">
+      <span class="eyebrow">INTERVENÇÃO HUMANA OBRIGATÓRIA</span>
+      <h3 id="interventionTitle">Ação operacional necessária</h3>
+      <p id="interventionText">Confirme que a tratativa foi lida para continuar no painel.</p>
+      <div id="interventionDetails" class="intervention-details"></div>
+      <button id="interventionConfirm" class="primary" type="button">Confirmar leitura da tratativa</button>
+    </div>
+  </div>
+
+  <div id="assistantBackdrop" class="assistant-backdrop" hidden></div>
+  <div id="assistantWidget" class="assistant-widget">
+    <button id="assistantToggle" class="assistant-toggle" type="button" aria-expanded="false" aria-controls="assistantChat" aria-label="Abrir assistente técnico">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+    </button>
+    <section id="assistantChat" class="assistant-chat" hidden aria-label="Assistente técnico">
+      <header class="assistant-chat-header">
+        <div><span class="eyebrow">ASSISTENTE TÉCNICO · RAG</span><h3>Copiloto de tratativas</h3></div>
+        <button id="assistantClose" class="assistant-chat-close" type="button" aria-label="Fechar assistente">✕</button>
+      </header>
+      <div class="quick-prompts"><button class="quick-prompt" data-prompt="Analise o estado atual do box e indique os próximos passos seguros.">Analisar estado atual</button><button class="quick-prompt" data-prompt="Como tratar uma obstrução do sensor com segurança?">Tratar obstrução</button><button class="quick-prompt" data-prompt="Como validar uma leitura com baixa confiança?">Baixa confiança</button></div>
+      <div id="assistantMessages" class="assistant-messages" aria-live="polite">
+        <div class="assistant-msg assistant-msg-bot">Selecione uma anomalia ou faça uma pergunta operacional.</div>
+      </div>
+      <p id="assistantTyping" class="assistant-typing" hidden>Consultando procedimentos e contexto operacional...</p>
+      <form id="assistantForm" class="assistant-chat-form">
+        <textarea id="assistantQuestion" rows="2" maxlength="1200" placeholder="Ex.: O que devo verificar antes de recalibrar o box?" required></textarea>
+        <button class="primary compact" type="submit">Enviar</button>
+      </form>
+      <div class="assistant-meta"><span>Respostas de apoio - decisão final humana</span><span id="assistantCount">0/1200</span></div>
+    </section>
+  </div>
+
+  <script src="{{ url_for('static', filename='toast.js') }}"></script>
+>>>>>>> 62ebd29 (feat: alertas, relatórios, sync edge-railway e preparo raspberry)
   <script src="{{ url_for('static', filename='admin.js') }}"></script>
 </body>
 </html>

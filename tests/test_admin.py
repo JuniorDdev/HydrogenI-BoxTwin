@@ -89,3 +89,14 @@ def test_recipient_rule_detail_and_twilio_reply(tmp_path):
     assert reply.status_code == 200
     detail = client.get(f"/api/admin/anomalies/{anomaly_id}").get_json()
     assert detail["anomaly"]["status"] == "in_progress"
+
+
+def test_admin_sync_status(tmp_path):
+    client = make_client(tmp_path)
+    login(client)
+    response = client.get("/api/admin/sync-status")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["pending"] == 0
+    assert payload["synced"] == 0
+    assert payload["enabled"] is False

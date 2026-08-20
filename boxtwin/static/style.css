@@ -15,3 +15,41 @@
 @media(max-width:980px){.landing-menu{gap:12px}.landing-hero{grid-template-columns:1fr;gap:45px;padding-top:45px}.product-stage{width:min(620px,100%);margin:0 auto}.problem-grid{grid-template-columns:1fr 1fr}.problem-grid .solution-card{grid-column:1/-1}.capabilities-section{grid-template-columns:1fr}.architecture-callout{grid-template-columns:1fr}.landing-copy h1 em{display:inline}}
 @media(max-width:760px){.menu-toggle{display:block}.landing-menu{position:absolute;display:none;top:68px;left:0;right:0;align-items:stretch;flex-direction:column;gap:5px;padding:15px;border:1px solid #d9e4ec;border-radius:14px;background:#fff;box-shadow:0 20px 40px #0715261f}.landing-menu.open{display:flex}.landing-menu>a{padding:11px}.landing-hero{min-height:0}.product-window{transform:none}.preview-body{grid-template-columns:1fr}.problem-grid,.capability-grid,.flow-grid{grid-template-columns:1fr}.capability-grid .capability-feature{grid-row:auto}.flow-grid:before{display:none}.flow-grid article{padding:18px;border:1px solid #ffffff13;border-radius:14px}.flow-grid article>b{margin-bottom:15px}.architecture-callout{padding:32px 22px}.architecture-flow{justify-content:flex-start}.landing-footer{align-items:flex-start;flex-direction:column;gap:16px}.landing-footer p{margin:0}.admin-actions{width:100%;flex-wrap:wrap}.admin-actions>*{flex:1}}
 @media(max-width:480px){.landing-nav,.landing-hero,.landing-section,.landing-cta,.landing-footer{width:min(100% - 26px,1180px)}.landing-copy h1{font-size:42px}.hero-actions{align-items:stretch;flex-direction:column}.proof-row{align-items:flex-start;flex-direction:column;gap:10px}.preview-metrics{grid-template-columns:1fr;margin:11px}.preview-metrics>div{display:flex;align-items:center;justify-content:space-between;padding:10px}.preview-body{padding:0 11px 11px}.landing-section{padding:70px 0}.flow-section{width:100%;padding:70px 13px}.landing-cta{margin-top:70px;margin-bottom:70px}.architecture-callout{width:calc(100% - 26px)}}
+<<<<<<< HEAD
+=======
+
+/* Toast/banner de feedback (substitui alert()/confirm() nativos) */
+.toast-container{position:fixed;top:20px;right:20px;z-index:1000;display:flex;flex-direction:column;gap:10px;width:min(360px,calc(100% - 32px))}
+.toast{position:relative;padding:14px 16px;border-radius:12px;background:#122c46;color:#fff;font-size:13px;line-height:1.5;box-shadow:0 14px 32px #09182b40;border-left:4px solid var(--cyan);opacity:0;transform:translateY(-8px);transition:opacity .25s ease,transform .25s ease}
+.toast.visible{opacity:1;transform:none}
+.toast-success{border-left-color:var(--green)}
+.toast-error{border-left-color:var(--red)}
+.toast p{margin:0}
+.toast-confirm .toast-actions{display:flex;gap:8px;margin-top:12px}
+.toast-confirm .toast-actions button{width:auto;margin:0;padding:8px 13px;font-size:12px}
+.toast-confirm .toast-confirm-btn{background:var(--blue);color:#fff}
+.toast-confirm .toast-cancel-btn{background:#26456a;color:#dce9f7}
+.form-warning{margin:0 0 12px;padding:10px 12px;border-radius:9px;background:#fff3d9;border-left:4px solid var(--amber);color:#7a5300;font-size:12px}
+@media(max-width:480px){.toast-container{left:16px;right:16px;top:14px;width:auto}}
+
+/* Alertas operacionais com foco de demo */
+.alert-signal{margin-bottom:18px;border:1px solid #ffd38f;background:linear-gradient(120deg,#fff7e7,#fff0f2)}
+.alert-signal.active{animation:signalPulse 1.2s ease-in-out infinite;border-color:#ef5b67;box-shadow:0 0 0 0 #ef5b6740}
+.alert-signal.danger{border-color:#ef5b67;background:linear-gradient(120deg,#fff1f3,#ffe9ec)}
+.alert-signal.warning{border-color:#ffb547;background:linear-gradient(120deg,#fff8e8,#fff3dc)}
+.alert-signal-meta{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:#ffffffb3;color:#7a2430;font-size:11px;font-weight:800}
+.alert-signal-text{margin:10px 0 0;color:#5f4650;line-height:1.6}
+.incident.needs-attention{background:linear-gradient(120deg,#fff8eb,#fff3f5);animation:signalPulse 1.2s ease-in-out infinite}
+.alert-pill{display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:7px 10px;border-radius:999px;background:#fff;color:#7a2430;font-size:10px;font-weight:800;border:1px solid #ffd0d5}
+.alert-pill.email-sent{color:#0f7a57;border-color:#a9ecd6;background:#e4faf3}
+.intervention-modal{position:fixed;inset:0;z-index:990;display:grid;place-items:center;padding:18px;background:#05111fd1}
+.intervention-modal[hidden]{display:none!important}
+.intervention-card{width:min(560px,calc(100vw - 28px));padding:24px;border-radius:20px;background:#fff;color:#122234;box-shadow:0 28px 80px #0007;border:1px solid #dbe5ed}
+.intervention-card h3{margin:8px 0 10px;font-size:26px}
+.intervention-card p{margin:0;color:#5f7388;line-height:1.6}
+.intervention-details{display:grid;gap:10px;margin:18px 0 6px}
+.intervention-details div{padding:12px;border-radius:12px;background:#eef6fc}
+.intervention-details b,.intervention-details small{display:block}
+.intervention-details small{margin-top:4px;color:#6f8095}
+@keyframes signalPulse{0%,100%{transform:translateY(0);box-shadow:0 0 0 0 #ef5b6722}50%{transform:translateY(-1px);box-shadow:0 0 0 10px #ef5b6700}}
+>>>>>>> 62ebd29 (feat: alertas, relatórios, sync edge-railway e preparo raspberry)

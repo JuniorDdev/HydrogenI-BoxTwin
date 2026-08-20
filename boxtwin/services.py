@@ -147,6 +147,71 @@ class NotificationService:
             return json.loads(response.read().decode()).get("sid")
 
 
+class EdgeSyncService:
+    """Sincroniza leituras persistidas localmente com um endpoint central idempotente."""
+
+    def __init__(self, config, database):
+        self.config = config
+        self.database = database
+
+    def enabled(self):
+        return bool(self.config["EDGE_SYNC_ENABLED"] and self.config["EDGE_SYNC_TARGET_URL"] and self.config["EDGE_SYNC_TOKEN"])
+
+    def enqueue(self, reading_id, payload):
+        if not self.config["EDGE_SYNC_TARGET_URL"]:
+            return
+        self.database.enqueue_sync(
+            reading_id,
+            payload["reading_uuid"],
+            payload,
+            self.config["EDGE_SYNC_TARGET_URL"],
+        )
+
+    def process_queue(self):
+        if not self.enabled():
+            return []
+        results = []
+        for item in self.database.sync_queue_batch(self.config["EDGE_SYNC_BATCH_SIZE"]):
+            self.database.mark_sync_attempt(item["id"])
+            try:
+                response = self._post_reading(json.loads(item["payload_json"]))
+                if not response.get("accepted"):
+                    raise RuntimeError(response.get("error") or "Ingestão recusada.")
+                self.database.mark_sync_success(item["id"])
+                results.append({"reading_uuid": item["reading_uuid"], "status": "synced"})
+            except Exception as exc:
+                self.database.mark_sync_failure(item["id"], exc)
+                results.append({"reading_uuid": item["reading_uuid"], "status": "failed", "error": str(exc)[:200]})
+        return results
+
+    def status(self):
+        return {
+            "enabled": self.enabled(),
+            "target_url": self.config["EDGE_SYNC_TARGET_URL"] or None,
+            **self.database.sync_status(),
+        }
+
+    def _post_reading(self, payload):
+        endpoint = f"{self.config['EDGE_SYNC_TARGET_URL']}/api/edge/readings"
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        req = request.Request(
+            endpoint,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.config['EDGE_SYNC_TOKEN']}",
+                "User-Agent": "HydrogenI-BoxTwin-EdgeSync/1.0",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=self.config["EDGE_SYNC_TIMEOUT_SECONDS"]) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urlerror.HTTPError as exc:
+            detail = exc.read().decode(errors="replace")[:400]
+            raise RuntimeError(f"Falha no endpoint central ({exc.code}): {detail}") from exc
+
+
 class RagService:
     """RAG local simples: recupera procedimentos relevantes e gera tratativa rastreável."""
     def __init__(self, knowledge_path):
@@ -168,9 +233,13 @@ class RagService:
     def answer(self, question, context=None):
         sources = self.retrieve(question, context)
         if not sources:
-            return {"answer": "Não encontrei um procedimento correspondente. Encaminhe a anomalia a um responsável técnico.", "sources": [], "mode": "local-rag"}
+            return {"answer": "Olá. No momento não encontrei um procedimento bem aderente ao caso. Minha orientação mais segura é isolar a ocorrência, registrar a evidência e encaminhar para um responsável técnico validar a próxima ação.", "sources": [], "mode": "local-rag"}
         steps = sources[0]["content"]
-        return {"answer": f"Tratativa sugerida: {steps}", "sources": [{"id": d["id"], "title": d["title"]} for d in sources], "mode": "local-rag"}
+        return {
+            "answer": f"Olá. Pela ocorrência descrita, a tratativa mais adequada agora é a seguinte: {steps} Depois disso, vale confirmar uma nova leitura e registrar o que foi observado para manter a rastreabilidade da operação.",
+            "sources": [{"id": d["id"], "title": d["title"]} for d in sources],
+            "mode": "local-rag",
+        }
 
 
 class GrokService:
@@ -182,7 +251,34 @@ class GrokService:
         if not self.config["XAI_ENABLED"] or not self.config["XAI_API_KEY"]:
             return self.rag.answer(question, context)
         references = "\n".join(f"[{d['id']}] {d['title']}: {d['content']}" for d in sources)
+<<<<<<< HEAD
         system = "Você é o assistente técnico do HydrogenI BoxTwin. Responda em português, use somente os procedimentos fornecidos, cite seus IDs, não invente ações e exija confirmação humana para decisões operacionais."
+=======
+        system = (
+            "Você é o assistente técnico do HydrogenI BoxTwin, falando como um colega experiente orientando um "
+            "operador de armazém. Responda em português, em linguagem natural e operacional, do jeito que se "
+            "explicaria pessoalmente para alguém no chão de fábrica.\n"
+            "Soe humano, educado, sereno e sensato. Quando fizer sentido, comece com uma saudação breve e natural, "
+            "sem exagero, e conduza a resposta como apoio prático à decisão.\n"
+            "Nunca cite nomes de campos técnicos, chaves de JSON ou de banco de dados (como capacity_percent, "
+            "valid_zones, reading_id etc.) — traduza esses dados para termos que o operador entenda (ex.: "
+            "'a ocupação está por volta de 92%', nunca 'capacity_percent: 92.3').\n"
+            "Use somente os procedimentos fornecidos e cite seus IDs (ex.: PROC-003) como referência das fontes.\n"
+            "Você não executa nenhuma ação nem tem acesso ao sistema — só recomenda. Nunca peça confirmação para "
+            "agir, nunca diga que vai prosseguir ou executar algo. Termine a resposta orientando o operador a "
+            "avaliar e executar conforme sua avaliação operacional, não pedindo permissão para agir.\n"
+            "Nunca use formatação markdown de nenhum tipo: sem **negrito**, sem #, ##, ### de títulos, sem "
+            "--- ou ___ de divisórias, sem `crase`, sem colchetes/links, sem listas com - ou *. Escreva em texto "
+            "corrido normal, com quebras de linha simples separando ideias. Quando precisar listar passos, use "
+            "apenas número seguido de ponto e espaço, como '1. Confirme a leitura' — nunca marcadores ou símbolos."
+        )
+        messages = [{"role": "system", "content": system}]
+        for turn in (history or [])[-6:]:
+            if turn.get("question"):
+                messages.append({"role": "user", "content": str(turn["question"])})
+            if turn.get("answer"):
+                messages.append({"role": "assistant", "content": str(turn["answer"])})
+>>>>>>> 62ebd29 (feat: alertas, relatórios, sync edge-railway e preparo raspberry)
         prompt = f"Pergunta: {question}\nDados da anomalia: {json.dumps(context or {}, ensure_ascii=False)}\nProcedimentos:\n{references or 'Nenhum procedimento recuperado.'}"
         payload = json.dumps({"model": self.config["XAI_MODEL"], "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}]}).encode()
         req = request.Request(f"{self.config['XAI_BASE_URL']}/chat/completions", data=payload, headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.config['XAI_API_KEY']}"})
