@@ -261,7 +261,12 @@ def assistant():
             "latest_reading": latest_reading,
             "active_anomalies": runtime().database.anomalies(10, "open"),
         }
-    return jsonify(runtime().assistant.answer(question, context))
+    history = [
+        {"question": str(turn.get("question", ""))[:1200], "answer": str(turn.get("answer", ""))[:2000]}
+        for turn in (payload.get("history") or [])
+        if isinstance(turn, dict)
+    ][-6:]
+    return jsonify(runtime().assistant.answer(question, context, history))
 
 
 def valid_twilio_signature():

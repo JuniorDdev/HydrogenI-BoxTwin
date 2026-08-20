@@ -28,7 +28,7 @@ Para o aplicativo Flutter, a etapa seguinte deverá substituir a sessão web nas
 
 A base inicial fica em `boxtwin/knowledge/procedures.json`. O serviço recupera documentos por relevância lexical e devolve as fontes utilizadas. Essa abordagem funciona offline e é adequada ao MVP. Na evolução, o mesmo contrato pode usar embeddings, um banco vetorial e um modelo de linguagem; mantenha sempre as fontes, os limites de decisão e a aprovação humana para ações operacionais.
 
-Quando `XAI_ENABLED=true`, o Grok recebe a pergunta, os dados técnicos da anomalia e somente os procedimentos recuperados. Se houver timeout, indisponibilidade ou chave inválida, a resposta volta automaticamente ao modo `local-rag`.
+Quando `GROQ_ENABLED=true`, o Groq recebe a pergunta, o histórico recente da conversa, os dados técnicos da anomalia e somente os procedimentos recuperados. Se houver timeout, indisponibilidade ou chave inválida, a resposta volta automaticamente ao modo `local-rag`.
 
 ## Respostas pelo Twilio
 

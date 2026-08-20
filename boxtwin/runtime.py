@@ -4,7 +4,7 @@ import time
 from .sensors import build_sensor
 from pathlib import Path
 
-from .services import AlertService, CalibrationService, GrokService, NotificationService, RagService, VolumeService
+from .services import AlertService, CalibrationService, GroqService, NotificationService, RagService, VolumeService
 
 
 class BoxTwinRuntime:
@@ -17,7 +17,7 @@ class BoxTwinRuntime:
         self.alerts = AlertService(config["CAPACITY_ALERT_PERCENT"], config["MIN_CONFIDENCE_PERCENT"])
         self.notifications = NotificationService(config, database)
         self.rag = RagService(Path(__file__).parent / "knowledge" / "procedures.json")
-        self.assistant = GrokService(config, self.rag)
+        self.assistant = GroqService(config, self.rag)
         self._stop = threading.Event()
         self._thread = None
 

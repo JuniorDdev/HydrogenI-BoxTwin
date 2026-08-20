@@ -120,12 +120,12 @@ Além do painel do gêmeo digital, esta versão inclui:
 - área administrativa autenticada em `/admin`;
 - fila de anomalias com registro de ciência;
 - atualização em tempo real via Server-Sent Events (SSE);
-- notificações opcionais por SMTP e Twilio (SMS ou WhatsApp Sandbox);
+- notificações opcionais por e-mail (Resend) e Twilio (SMS ou WhatsApp Sandbox);
 - assistente local com RAG sobre procedimentos em `boxtwin/knowledge/procedures.json`;
 - PWA responsiva para Android e contrato JSON reutilizável por um futuro app Flutter.
 - cadastro de responsáveis individuais ou equipes;
 - regras por anomalia, severidade, canal e tempo de escalonamento;
-- Grok pela API da xAI com fallback automático para o RAG local;
+- Groq (GroqCloud) com fallback automático para o RAG local;
 - página detalhada de cada incidente, evidências e linha do tempo;
 - estados `aberta`, `ciente`, `em atendimento`, `resolvida` e `falso positivo`;
 - webhooks Twilio para status de entrega e respostas `1 ID`, `2 ID` ou `3 ID`.

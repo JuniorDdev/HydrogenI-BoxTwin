@@ -35,7 +35,7 @@ CAPACITY_ALERT_PERCENT=85
 MIN_CONFIDENCE_PERCENT=70
 EMAIL_ENABLED=false
 TWILIO_ENABLED=false
-XAI_ENABLED=false
+GROQ_ENABLED=false
 TWILIO_VALIDATE_SIGNATURE=true
 ```
 
@@ -47,7 +47,7 @@ Depois de gerar o domínio público, acrescente:
 PUBLIC_BASE_URL=https://SEU-DOMINIO.up.railway.app
 ```
 
-Ative Grok, Twilio e e-mail separadamente somente depois de validar painel, login, banco e Volume.
+Ative Groq, Twilio e e-mail separadamente somente depois de validar painel, login, banco e Volume.
 
 ## Verificação
 
