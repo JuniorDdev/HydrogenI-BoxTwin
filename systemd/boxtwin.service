@@ -1,17 +1,18 @@
 [Unit]
-Description=BoxTwin 3D BoxNode
-After=network.target
+Description=HydrogenI BoxTwin BoxNode
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
 User=pi
+Group=pi
 WorkingDirectory=/opt/boxtwin
-EnvironmentFile=/opt/boxtwin/.env
-ExecStart=/opt/boxtwin/.venv/bin/python app.py
+EnvironmentFile=/opt/boxtwin/.env.raspberry
+ExecStart=/opt/boxtwin/.venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 8 --timeout 120 app:app
 Restart=always
 RestartSec=5
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target
-
-ExecStart=/home/pi/HydrogenI-BoxTwin/.venv/bin/gunicorn --bind 0.0.0.0:5000 --certfile=/home/pi/HydrogenI-BoxTwin/cert.pem --keyfile=/home/pi/HydrogenI-BoxTwin/key.pem --workers 1 --threads 8 --timeout 120 app:app
