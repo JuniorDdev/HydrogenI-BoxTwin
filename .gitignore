@@ -29,6 +29,7 @@ Thumbs.db
 # Arquivos de configuração sensíveis (mas você pode querer versionar o .env.example)
 .env
 .env.local
+.env.raspberry
 
 # Arquivos do editor
 .vscode/
