@@ -1,6 +1,21 @@
 const $ = id => document.getElementById(id);
 const state = { latest: null, health: null, activeScenario: null };
 
+// Estado centralizado da câmera do gêmeo digital 3D. Hoje só os valores padrão são usados (a vista
+// isométrica fixa de sempre) — mas por estarem aqui, uma extensão futura de arrastar-para-girar ou
+// scroll-para-zoom só precisa alterar estes números e chamar drawTwin() de novo para redesenhar,
+// sem tocar na lógica de projeção em si.
+const viewState = {
+  rotationY: Math.PI / 4, // giro em torno do eixo vertical (azimute), em radianos.
+                          // Extensão futura: pointerdown/pointermove horizontal ajustaria este valor.
+  rotationX: 0.48,        // inclinação vertical da vista, como razão escalaY/escalaX (0 = vista de
+                          // topo, 1 = vista mais lateral) — é uma projeção axonométrica simplificada,
+                          // não uma câmera 3D completa.
+                          // Extensão futura: pointerdown/pointermove vertical ajustaria este valor.
+  zoom: 1,                // fator de escala geral aplicado a X, Y e Z.
+                          // Extensão futura: evento wheel ou gesto de pinça (touch) ajustaria este valor.
+};
+
 function fmt(value, digits = 1) {
   return Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '—';
 }
@@ -46,13 +61,23 @@ function drawTwin(grid) {
   ctx.clearRect(0, 0, width, height);
   const maxValue = Math.max(...grid.flat(), .001);
   const centerX = width * .50, originY = height * .76;
-  const scaleX = Math.min(width / 19, 31), scaleY = scaleX * .48;
+  const scaleX = Math.min(width / 19, 31) * viewState.zoom;
+  const scaleY = scaleX * viewState.rotationX;
   const boxHeight = Math.max(state.health?.dimensions_m?.height || .5, maxValue, .001);
-  const scaleZ = Math.min(height * .5, originY - 18) / boxHeight;
-  const project = (row, col, z = 0) => ({
-    x: centerX + (col - row) * scaleX,
-    y: originY + (col + row - 7) * scaleY - z * scaleZ
-  });
+  const scaleZ = (Math.min(height * .5, originY - 18) / boxHeight) * viewState.zoom;
+
+  // Projeção axonométrica: gira (row,col) em torno do centro da matriz 8x8 pelo ângulo de
+  // viewState.rotationY antes de aplicar a inclinação/escala. Com os valores padrão acima
+  // (rotationY = 45°), o resultado é matematicamente idêntico à projeção isométrica fixa original.
+  const cosYaw = Math.cos(viewState.rotationY) * Math.SQRT2;
+  const sinYaw = Math.sin(viewState.rotationY) * Math.SQRT2;
+  const project = (row, col, z = 0) => {
+    const u = col - 3.5, v = row - 3.5;
+    return {
+      x: centerX + (u * cosYaw - v * sinYaw) * scaleX,
+      y: originY + (u * sinYaw + v * cosYaw) * scaleY - z * scaleZ
+    };
+  };
 
   ctx.strokeStyle = '#78b8df55'; ctx.lineWidth = 1;
   const base = [project(0,0), project(0,7), project(7,7), project(7,0)];
@@ -204,4 +229,12 @@ $('calibrate').onclick = () => {
   showConfirmToast('A calibração definirá o box como vazio. Deseja continuar?', performCalibration, {confirmLabel:'Calibrar', cancelLabel:'Cancelar'});
 };
 window.addEventListener('resize',()=>{if(state.latest)drawTwin(state.latest.height_grid_m);loadHistory().catch(()=>{});});
+
+// Extensão futura (não implementada): handlers de pointerdown/pointermove/pointerup no #twinCanvas
+// (mouse e touch) leriam o deslocamento do arraste, ajustariam viewState.rotationY (arraste
+// horizontal) e viewState.rotationX (arraste vertical), e chamariam
+// drawTwin(state.latest.height_grid_m) para redesenhar — igual ao listener de resize acima já faz.
+// Um listener de 'wheel' (e gestos de pinça em touch) ajustaria viewState.zoom do mesmo jeito.
+// Nenhum desses handlers existe ainda; drawTwin() e viewState já estão prontos para recebê-los.
+
 initialize();
