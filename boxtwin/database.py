@@ -1,6 +1,6 @@
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 
 class Database:
@@ -17,6 +17,7 @@ class Database:
             connection.execute("""
                 CREATE TABLE IF NOT EXISTS readings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    reading_uuid TEXT UNIQUE,
                     created_at TEXT NOT NULL,
                     node_id TEXT NOT NULL,
                     volume_m3 REAL NOT NULL,
@@ -36,6 +37,7 @@ class Database:
             """)
             existing = {row[1] for row in connection.execute("PRAGMA table_info(readings)")}
             migrations = {
+                "reading_uuid": "TEXT",
                 "scenario": "TEXT",
                 "reference_percent": "REAL",
                 "reference_error_points": "REAL",
@@ -97,24 +99,40 @@ class Database:
                     event_type TEXT NOT NULL,
                     note TEXT
                 );
+                CREATE TABLE IF NOT EXISTS sync_queue (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    reading_id INTEGER NOT NULL UNIQUE,
+                    reading_uuid TEXT NOT NULL UNIQUE,
+                    created_at TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    target_url TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    last_attempt_at TEXT,
+                    synced_at TEXT,
+                    last_error TEXT,
+                    FOREIGN KEY(reading_id) REFERENCES readings(id)
+                );
             """)
             notification_columns = {row[1] for row in connection.execute("PRAGMA table_info(notification_log)")}
             for column in ("provider_message_id", "delivery_status", "recipient_id"):
                 if column not in notification_columns:
                     connection.execute(f"ALTER TABLE notification_log ADD COLUMN {column} {'INTEGER' if column == 'recipient_id' else 'TEXT'}")
+            connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_readings_uuid ON readings(reading_uuid)")
+            connection.execute("CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, id)")
 
     def save_reading(self, reading):
         created_at = datetime.now(timezone.utc).isoformat()
         with self.connect() as connection:
             cursor = connection.execute("""
                 INSERT INTO readings (
-                    created_at, node_id, volume_m3, capacity_percent,
+                    reading_uuid, created_at, node_id, volume_m3, capacity_percent,
                     confidence_percent, valid_zones, status, alerts_json, grid_json
                     , scenario, reference_percent, reference_error_points,
                     average_height_m, maximum_height_m, capacity_m3
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                created_at, reading["node_id"], reading["volume_m3"], reading["capacity_percent"],
+                reading["reading_uuid"], created_at, reading["node_id"], reading["volume_m3"], reading["capacity_percent"],
                 reading["confidence_percent"], reading["valid_zones"], reading["status"],
                 json.dumps(reading["alerts"]), json.dumps(reading["height_grid_m"]),
                 reading.get("scenario"), reading.get("reference_percent"),
@@ -122,6 +140,97 @@ class Database:
                 reading.get("maximum_height_m"), reading.get("capacity_m3"),
             ))
             return cursor.lastrowid, created_at
+
+    def find_reading_by_uuid(self, reading_uuid):
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM readings WHERE reading_uuid=?", (reading_uuid,)).fetchone()
+        return self._serialize(row) if row else None
+
+    def enqueue_sync(self, reading_id, reading_uuid, payload, target_url):
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO sync_queue
+                (reading_id, reading_uuid, created_at, payload_json, target_url, status)
+                VALUES (?, ?, ?, ?, ?, 'pending')
+                """,
+                (
+                    reading_id,
+                    reading_uuid,
+                    datetime.now(timezone.utc).isoformat(),
+                    json.dumps(payload, ensure_ascii=False),
+                    target_url,
+                ),
+            )
+
+    def sync_queue_batch(self, limit=20):
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM sync_queue
+                WHERE status IN ('pending', 'failed')
+                ORDER BY id
+                LIMIT ?
+                """,
+                (max(1, min(int(limit), 100)),),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def mark_sync_attempt(self, item_id):
+        with self.connect() as connection:
+            connection.execute(
+                """
+                UPDATE sync_queue
+                SET attempts = attempts + 1,
+                    last_attempt_at = ?,
+                    status = 'retrying'
+                WHERE id=?
+                """,
+                (datetime.now(timezone.utc).isoformat(), item_id),
+            )
+
+    def mark_sync_success(self, item_id):
+        now = datetime.now(timezone.utc).isoformat()
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE sync_queue SET status='synced', synced_at=?, last_error=NULL WHERE id=?",
+                (now, item_id),
+            )
+
+    def mark_sync_failure(self, item_id, error_message):
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE sync_queue SET status='failed', last_error=? WHERE id=?",
+                (str(error_message)[:500], item_id),
+            )
+
+    def sync_status(self):
+        with self.connect() as connection:
+            counts = {
+                row["status"]: row["count"]
+                for row in connection.execute(
+                    "SELECT status, COUNT(*) count FROM sync_queue GROUP BY status"
+                ).fetchall()
+            }
+            latest = connection.execute(
+                "SELECT synced_at, last_attempt_at, last_error, target_url FROM sync_queue ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        return {
+            "pending": counts.get("pending", 0),
+            "retrying": counts.get("retrying", 0),
+            "failed": counts.get("failed", 0),
+            "synced": counts.get("synced", 0),
+            "last_synced_at": latest["synced_at"] if latest else None,
+            "last_attempt_at": latest["last_attempt_at"] if latest else None,
+            "last_error": latest["last_error"] if latest else None,
+            "target_url": latest["target_url"] if latest else None,
+        }
+
+    def ingest_synced_reading(self, reading):
+        existing = self.find_reading_by_uuid(reading["reading_uuid"])
+        if existing:
+            return existing["id"], existing["created_at"], False
+        return (*self.save_reading(reading), True)
 
     def latest(self):
         with self.connect() as connection:
@@ -149,8 +258,13 @@ class Database:
     def anomalies(self, limit=100, status=None):
         query, params = "SELECT * FROM anomalies", []
         if status:
-            query += " WHERE status = ?"
-            params.append(status)
+            if status == "active":
+                query += " WHERE status IN ('open', 'acknowledged', 'in_progress')"
+            elif status == "closed":
+                query += " WHERE status IN ('resolved', 'false_positive')"
+            else:
+                query += " WHERE status = ?"
+                params.append(status)
         query += " ORDER BY id DESC LIMIT ?"
         params.append(max(1, min(int(limit), 500)))
         with self.connect() as connection:
@@ -201,9 +315,23 @@ class Database:
 
     def save_rule(self, payload):
         with self.connect() as connection:
+            values = (
+                payload["anomaly_type"], payload.get("severity", "*"),
+                int(payload["recipient_id"]), payload["channel"],
+                max(0, int(payload.get("escalation_minutes", 0))),
+            )
+            existing = connection.execute(
+                """SELECT id FROM notification_rules
+                   WHERE anomaly_type=? AND severity=? AND recipient_id=?
+                     AND channel=? AND escalation_minutes=? AND active=1
+                   ORDER BY id LIMIT 1""",
+                values,
+            ).fetchone()
+            if existing:
+                return existing["id"]
             cursor = connection.execute(
                 "INSERT INTO notification_rules (anomaly_type, severity, recipient_id, channel, escalation_minutes, active) VALUES (?, ?, ?, ?, ?, ?)",
-                (payload["anomaly_type"], payload.get("severity", "*"), int(payload["recipient_id"]), payload["channel"], max(0, int(payload.get("escalation_minutes", 0))), int(payload.get("active", True))),
+                (*values, int(payload.get("active", True))),
             )
             return cursor.lastrowid
 
@@ -260,10 +388,122 @@ class Database:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def active_alerts(self, limit=10):
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    a.id,
+                    a.created_at,
+                    a.anomaly_type,
+                    a.severity,
+                    a.message,
+                    a.status,
+                    a.acknowledged_at,
+                    EXISTS(
+                        SELECT 1
+                        FROM notification_log n
+                        WHERE n.anomaly_id = a.id
+                          AND n.channel = 'email'
+                          AND n.status = 'sent'
+                    ) AS email_sent
+                FROM anomalies a
+                WHERE a.status IN ('open', 'acknowledged')
+                ORDER BY a.id DESC
+                LIMIT ?
+                """,
+                (max(1, min(int(limit), 50)),),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def cleanup(self, *, readings_retention_days, notifications_retention_days, incidents_retention_days, sync_queue_retention_days):
+        now = datetime.now(timezone.utc)
+        readings_cutoff = (now - timedelta(days=max(1, readings_retention_days))).isoformat()
+        notifications_cutoff = (now - timedelta(days=max(1, notifications_retention_days))).isoformat()
+        incidents_cutoff = (now - timedelta(days=max(1, incidents_retention_days))).isoformat()
+        sync_cutoff = (now - timedelta(days=max(1, sync_queue_retention_days))).isoformat()
+
+        with self.connect() as connection:
+            active_or_recent_reading_ids = {
+                row["reading_id"]
+                for row in connection.execute(
+                    """
+                    SELECT reading_id
+                    FROM anomalies
+                    WHERE reading_id IS NOT NULL
+                      AND (
+                        status IN ('open', 'acknowledged', 'in_progress')
+                        OR created_at >= ?
+                      )
+                    """,
+                    (incidents_cutoff,),
+                ).fetchall()
+            }
+            old_reading_rows = connection.execute(
+                "SELECT id FROM readings WHERE created_at < ?",
+                (readings_cutoff,),
+            ).fetchall()
+            removable_reading_ids = [
+                row["id"]
+                for row in old_reading_rows
+                if row["id"] not in active_or_recent_reading_ids
+            ]
+
+            if removable_reading_ids:
+                placeholders = ",".join("?" for _ in removable_reading_ids)
+                connection.execute(
+                    f"DELETE FROM sync_queue WHERE reading_id IN ({placeholders}) AND status != 'pending' AND status != 'failed' AND status != 'retrying'",
+                    removable_reading_ids,
+                )
+                connection.execute(
+                    f"DELETE FROM readings WHERE id IN ({placeholders})",
+                    removable_reading_ids,
+                )
+
+            connection.execute(
+                """
+                DELETE FROM notification_log
+                WHERE created_at < ?
+                  AND anomaly_id NOT IN (
+                    SELECT id FROM anomalies WHERE status IN ('open', 'acknowledged', 'in_progress')
+                  )
+                """,
+                (notifications_cutoff,),
+            )
+            connection.execute(
+                """
+                DELETE FROM incident_events
+                WHERE created_at < ?
+                  AND anomaly_id IN (
+                    SELECT id FROM anomalies WHERE status IN ('resolved', 'false_positive')
+                  )
+                """,
+                (incidents_cutoff,),
+            )
+            connection.execute(
+                """
+                DELETE FROM anomalies
+                WHERE created_at < ?
+                  AND status IN ('resolved', 'false_positive')
+                """,
+                (incidents_cutoff,),
+            )
+            connection.execute(
+                """
+                DELETE FROM sync_queue
+                WHERE synced_at < ?
+                  AND status = 'synced'
+                """,
+                (sync_cutoff,),
+            )
+
+        with self.connect() as connection:
+            connection.execute("VACUUM")
+
     @staticmethod
     def _serialize(row):
         return {
-            "id": row["id"], "created_at": row["created_at"], "node_id": row["node_id"],
+            "id": row["id"], "reading_uuid": row["reading_uuid"], "created_at": row["created_at"], "node_id": row["node_id"],
             "volume_m3": row["volume_m3"], "capacity_percent": row["capacity_percent"],
             "confidence_percent": row["confidence_percent"], "valid_zones": row["valid_zones"],
             "status": row["status"], "alerts": json.loads(row["alerts_json"]),

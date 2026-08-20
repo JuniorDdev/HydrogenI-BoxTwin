@@ -26,10 +26,17 @@
       <article><small>Incidentes resolvidos</small><div><strong id="adminResolved">-</strong></div><em>Histórico operacional</em></article>
       <article><small>Modo do sensor</small><div><strong id="adminSensorMode">-</strong></div><em id="adminReadingTime">Aguardando telemetria</em></article>
     </section>
+    <section id="adminAlertBanner" class="panel alert-signal" hidden>
+      <div class="panel-heading">
+        <div><span class="eyebrow">ALERTA AO CLIENTE</span><h3 id="adminAlertTitle">Tratativa pendente</h3></div>
+        <span id="adminAlertMeta" class="alert-signal-meta">Sem incidentes ativos</span>
+      </div>
+      <p id="adminAlertText" class="alert-signal-text">Nenhum alerta operacional aguardando intervenção humana.</p>
+    </section>
 
     <section class="admin-grid single-column">
       <article class="panel">
-        <div class="panel-heading"><div><span class="eyebrow">FILA OPERACIONAL</span><h3>Anomalias recentes</h3></div><div class="admin-actions"><a class="report-link" href="/admin/reports/operational.pdf">Baixar relatório PDF</a><button id="refreshAdmin" class="secondary compact">Atualizar</button></div></div>
+        <div class="panel-heading"><div><span class="eyebrow">FILA OPERACIONAL</span><h3>Anomalias que ainda exigem ação</h3></div><div class="admin-actions"><a class="report-link" href="/admin/reports">Página de relatórios</a><button id="refreshAdmin" class="secondary compact">Atualizar</button></div></div>
         <div id="anomalyList" class="incident-list"></div>
       </article>
     </section>
@@ -41,6 +48,16 @@
     <section class="panel"><div class="panel-heading"><div><span class="eyebrow">CANAIS EXTERNOS</span><h3>Histórico de notificações</h3></div></div><div id="notificationList" class="notification-list"></div></section>
     <footer><span>HydrogenI · BoxTwin 3D</span><p>Painel administrativo e operacional do BoxNode.</p></footer>
   </main>
+
+  <div id="interventionModal" class="intervention-modal" hidden>
+    <div class="intervention-card">
+      <span class="eyebrow">INTERVENÇÃO HUMANA OBRIGATÓRIA</span>
+      <h3 id="interventionTitle">Ação operacional necessária</h3>
+      <p id="interventionText">Confirme que a tratativa foi lida para continuar no painel.</p>
+      <div id="interventionDetails" class="intervention-details"></div>
+      <button id="interventionConfirm" class="primary" type="button">Confirmar leitura da tratativa</button>
+    </div>
+  </div>
 
   <div id="assistantBackdrop" class="assistant-backdrop" hidden></div>
   <div id="assistantWidget" class="assistant-widget">

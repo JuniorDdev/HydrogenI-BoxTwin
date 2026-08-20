@@ -10,7 +10,7 @@ from io import BytesIO
 from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, send_file, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .reports import build_operational_report
+from .reports import build_operational_report, build_operational_workbook
 
 bp = Blueprint("main", __name__)
 
@@ -68,6 +68,12 @@ def admin():
     return render_template("admin.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
 
 
+@bp.get("/admin/reports")
+@admin_required
+def reports_page():
+    return render_template("reports.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
+
+
 @bp.get("/api/admin/summary")
 @admin_required
 def admin_summary():
@@ -108,6 +114,38 @@ def operational_report():
     )
     filename = f"relatorio_boxtwin_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.pdf"
     response = send_file(BytesIO(pdf_bytes), mimetype="application/pdf", as_attachment=True, download_name=filename)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@bp.get("/admin/reports/operational.xlsx")
+@admin_required
+def operational_report_excel():
+    try:
+        limit = max(10, min(int(request.args.get("limit", 200)), 500))
+    except ValueError:
+        limit = 200
+    readings = runtime().database.history(limit)
+    anomalies = runtime().database.anomalies(limit, request.args.get("status"))
+    workbook_bytes = build_operational_workbook(
+        box_name=current_app.config["BOX_NAME"],
+        node_id=current_app.config["BOX_NODE_ID"],
+        sensor_mode=current_app.config["SENSOR_MODE"],
+        dimensions={
+            "length": runtime().volume.length_m,
+            "width": runtime().volume.width_m,
+            "height": runtime().volume.height_m,
+        },
+        readings=readings,
+        anomalies=anomalies,
+    )
+    filename = f"relatorio_boxtwin_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.xlsx"
+    response = send_file(
+        BytesIO(workbook_bytes),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=filename,
+    )
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -159,6 +197,15 @@ def history():
     return jsonify(runtime().database.history(request.args.get("limit", 50)))
 
 
+@bp.get("/api/alerts/active")
+def active_alerts():
+    items = runtime().database.active_alerts(request.args.get("limit", 10))
+    return jsonify({
+        "count": len(items),
+        "items": items,
+    })
+
+
 @bp.get("/api/stream")
 def stream():
     # Captura o runtime fora do gerador, evitando erro de contexto
@@ -185,6 +232,16 @@ def stream():
 @admin_required
 def anomalies():
     return jsonify(runtime().database.anomalies(request.args.get("limit", 100), request.args.get("status")))
+
+
+@bp.get("/api/admin/reports/summary")
+@admin_required
+def report_summary():
+    resolved_items = runtime().database.anomalies(request.args.get("limit", 200), "closed")
+    return jsonify({
+        "count": len(resolved_items),
+        "items": resolved_items,
+    })
 
 
 @bp.post("/api/admin/anomalies/<int:anomaly_id>/acknowledge")
@@ -282,6 +339,18 @@ def valid_twilio_signature():
     return hmac.compare_digest(signature, expected)
 
 
+def valid_edge_token():
+    configured = current_app.config.get("EDGE_SYNC_TOKEN", "")
+    if not configured:
+        return False
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        provided = auth_header[7:].strip()
+    else:
+        provided = request.headers.get("X-BoxTwin-Token", "").strip()
+    return hmac.compare_digest(provided, configured)
+
+
 @bp.post("/api/webhooks/twilio/status")
 def twilio_status():
     if not valid_twilio_signature():
@@ -306,6 +375,58 @@ def twilio_incoming():
         reply = f"BoxTwin #{anomaly_id} atualizado para {action}." if found else "Anomalia não encontrada."
     escaped = reply.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     return f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>{escaped}</Message></Response>', 200, {"Content-Type": "application/xml"}
+
+
+@bp.get("/api/admin/sync-status")
+@admin_required
+def sync_status():
+    return jsonify(runtime().edge_sync.status())
+
+
+@bp.post("/api/edge/readings")
+def edge_ingest_reading():
+    if not valid_edge_token():
+        return jsonify({"accepted": False, "error": "Token inválido."}), 403
+    payload = request.get_json(silent=True) or {}
+    required = {
+        "reading_uuid",
+        "node_id",
+        "volume_m3",
+        "capacity_percent",
+        "confidence_percent",
+        "valid_zones",
+        "status",
+        "alerts",
+        "height_grid_m",
+    }
+    missing = sorted(key for key in required if key not in payload)
+    if missing:
+        return jsonify({"accepted": False, "error": f"Campos ausentes: {', '.join(missing)}"}), 400
+    reading = {
+        "reading_uuid": str(payload["reading_uuid"]),
+        "node_id": str(payload["node_id"]),
+        "volume_m3": float(payload["volume_m3"]),
+        "capacity_percent": float(payload["capacity_percent"]),
+        "confidence_percent": float(payload["confidence_percent"]),
+        "valid_zones": int(payload["valid_zones"]),
+        "status": str(payload["status"]),
+        "alerts": payload["alerts"],
+        "height_grid_m": payload["height_grid_m"],
+        "scenario": payload.get("scenario"),
+        "reference_percent": payload.get("reference_percent"),
+        "reference_error_points": payload.get("reference_error_points"),
+        "average_height_m": payload.get("average_height_m"),
+        "maximum_height_m": payload.get("maximum_height_m"),
+        "capacity_m3": payload.get("capacity_m3"),
+    }
+    reading_id, created_at, created = runtime().database.ingest_synced_reading(reading)
+    return jsonify({
+        "accepted": True,
+        "created": created,
+        "reading_id": reading_id,
+        "reading_uuid": reading["reading_uuid"],
+        "created_at": created_at,
+    }), 201 if created else 200
 
 
 @bp.get("/manifest.webmanifest")

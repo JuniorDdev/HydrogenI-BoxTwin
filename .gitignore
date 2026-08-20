@@ -1,13 +1,35 @@
+# Ambientes virtuais
 .venv/
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.env
-.env.*
-!.env.example
+venv/
+env/
+
+# Arquivos de dados
 data/*.db
+data/offline_queue.json
+
+# Arquivos de calibração (são específicos do hardware)
 data/calibration.json
+
+# Arquivos de certificados SSL (gerados localmente)
+*.pem
+*.key
+
+# Cache do Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
 *.log
+
+# Arquivos do sistema
 .DS_Store
 Thumbs.db
-*.zip
+
+# Arquivos de configuração sensíveis (mas você pode querer versionar o .env.example)
+.env
+.env.local
+
+# Arquivos do editor
+.vscode/
+.idea/

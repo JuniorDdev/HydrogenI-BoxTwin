@@ -86,9 +86,18 @@ class NotificationService:
             self.last_sent[key] = now
             rules = self.database.matching_rules(anomaly)
             targets = rules or self._legacy_targets()
+            sent_targets = set()
             for target in targets:
                 if int(target.get("escalation_minutes", 0)) > 0:
                     continue  # processado pelo escalonador periódico
+                target_key = (
+                    target.get("channel"),
+                    target.get("email") or self.config["ALERT_EMAIL_TO"],
+                    target.get("phone") or self.config["TWILIO_TO"],
+                )
+                if target_key in sent_targets:
+                    continue
+                sent_targets.add(target_key)
                 result = self._send(anomaly, target)
                 if result:
                     results.append(result)
@@ -107,6 +116,12 @@ class NotificationService:
             status, detail = "sent", f"Notificação enviada para {target.get('recipient_name', 'destinatário')}"
         except Exception as exc:
             status, detail, provider_id = "failed", str(exc)[:300], None
+        safe_recipient = target.get("recipient_name") or "destinatário configurado"
+        print(
+            f"[BoxTwin][Notification] channel={channel} status={status} "
+            f"recipient={safe_recipient!r} detail={detail}",
+            flush=True,
+        )
         self.database.log_notification(anomaly["id"], channel, status, detail, provider_id, target.get("recipient_id"))
         return {"anomaly_id": anomaly["id"], "channel": channel, "status": status}
 
@@ -160,6 +175,71 @@ class NotificationService:
             return json.loads(response.read().decode()).get("sid")
 
 
+class EdgeSyncService:
+    """Sincroniza leituras persistidas localmente com um endpoint central idempotente."""
+
+    def __init__(self, config, database):
+        self.config = config
+        self.database = database
+
+    def enabled(self):
+        return bool(self.config["EDGE_SYNC_ENABLED"] and self.config["EDGE_SYNC_TARGET_URL"] and self.config["EDGE_SYNC_TOKEN"])
+
+    def enqueue(self, reading_id, payload):
+        if not self.config["EDGE_SYNC_TARGET_URL"]:
+            return
+        self.database.enqueue_sync(
+            reading_id,
+            payload["reading_uuid"],
+            payload,
+            self.config["EDGE_SYNC_TARGET_URL"],
+        )
+
+    def process_queue(self):
+        if not self.enabled():
+            return []
+        results = []
+        for item in self.database.sync_queue_batch(self.config["EDGE_SYNC_BATCH_SIZE"]):
+            self.database.mark_sync_attempt(item["id"])
+            try:
+                response = self._post_reading(json.loads(item["payload_json"]))
+                if not response.get("accepted"):
+                    raise RuntimeError(response.get("error") or "Ingestão recusada.")
+                self.database.mark_sync_success(item["id"])
+                results.append({"reading_uuid": item["reading_uuid"], "status": "synced"})
+            except Exception as exc:
+                self.database.mark_sync_failure(item["id"], exc)
+                results.append({"reading_uuid": item["reading_uuid"], "status": "failed", "error": str(exc)[:200]})
+        return results
+
+    def status(self):
+        return {
+            "enabled": self.enabled(),
+            "target_url": self.config["EDGE_SYNC_TARGET_URL"] or None,
+            **self.database.sync_status(),
+        }
+
+    def _post_reading(self, payload):
+        endpoint = f"{self.config['EDGE_SYNC_TARGET_URL']}/api/edge/readings"
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        req = request.Request(
+            endpoint,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.config['EDGE_SYNC_TOKEN']}",
+                "User-Agent": "HydrogenI-BoxTwin-EdgeSync/1.0",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=self.config["EDGE_SYNC_TIMEOUT_SECONDS"]) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urlerror.HTTPError as exc:
+            detail = exc.read().decode(errors="replace")[:400]
+            raise RuntimeError(f"Falha no endpoint central ({exc.code}): {detail}") from exc
+
+
 class RagService:
     """RAG local simples: recupera procedimentos relevantes e gera tratativa rastreável."""
 
@@ -201,9 +281,13 @@ class RagService:
     def answer(self, question, context=None, history=None):
         sources = self.retrieve(question, context, history)
         if not sources:
-            return {"answer": "Não encontrei um procedimento correspondente. Encaminhe a anomalia a um responsável técnico.", "sources": [], "mode": "local-rag"}
+            return {"answer": "Olá. No momento não encontrei um procedimento bem aderente ao caso. Minha orientação mais segura é isolar a ocorrência, registrar a evidência e encaminhar para um responsável técnico validar a próxima ação.", "sources": [], "mode": "local-rag"}
         steps = sources[0]["content"]
-        return {"answer": f"Tratativa sugerida: {steps}", "sources": [{"id": d["id"], "title": d["title"]} for d in sources], "mode": "local-rag"}
+        return {
+            "answer": f"Olá. Pela ocorrência descrita, a tratativa mais adequada agora é a seguinte: {steps} Depois disso, vale confirmar uma nova leitura e registrar o que foi observado para manter a rastreabilidade da operação.",
+            "sources": [{"id": d["id"], "title": d["title"]} for d in sources],
+            "mode": "local-rag",
+        }
 
 
 class GroqService:
@@ -221,6 +305,8 @@ class GroqService:
             "Você é o assistente técnico do HydrogenI BoxTwin, falando como um colega experiente orientando um "
             "operador de armazém. Responda em português, em linguagem natural e operacional, do jeito que se "
             "explicaria pessoalmente para alguém no chão de fábrica.\n"
+            "Soe humano, educado, sereno e sensato. Quando fizer sentido, comece com uma saudação breve e natural, "
+            "sem exagero, e conduza a resposta como apoio prático à decisão.\n"
             "Nunca cite nomes de campos técnicos, chaves de JSON ou de banco de dados (como capacity_percent, "
             "valid_zones, reading_id etc.) — traduza esses dados para termos que o operador entenda (ex.: "
             "'a ocupação está por volta de 92%', nunca 'capacity_percent: 92.3').\n"

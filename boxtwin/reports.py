@@ -1,6 +1,7 @@
 from io import BytesIO
 from zoneinfo import ZoneInfo
 
+from openpyxl import Workbook
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -172,4 +173,74 @@ def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, read
     ])])
 
     document.build(story, onFirstPage=footer, onLaterPages=footer)
+    return output.getvalue()
+
+
+def build_operational_workbook(*, box_name, node_id, sensor_mode, dimensions, readings, anomalies):
+    workbook = Workbook()
+    summary_sheet = workbook.active
+    summary_sheet.title = "Resumo"
+    summary_sheet.append(["Projeto", "Box", "Node", "Sensor", "Gerado em"])
+    summary_sheet.append([
+        "HydrogenI BoxTwin 3D",
+        box_name,
+        node_id,
+        "Simulado" if sensor_mode == "mock" else "Físico",
+        __import__("datetime").datetime.now(FORTALEZA).strftime("%d/%m/%Y %H:%M"),
+    ])
+    summary_sheet.append([])
+    summary_sheet.append(["Comprimento (m)", "Largura (m)", "Altura (m)", "Capacidade (m³)"])
+    summary_sheet.append([
+        dimensions["length"],
+        dimensions["width"],
+        dimensions["height"],
+        dimensions["length"] * dimensions["width"] * dimensions["height"],
+    ])
+
+    readings_sheet = workbook.create_sheet("Leituras")
+    readings_sheet.append([
+        "ID",
+        "UUID",
+        "Data e hora",
+        "Cenário",
+        "Volume (m³)",
+        "Ocupação (%)",
+        "Confiança (%)",
+        "Zonas válidas",
+        "Estado",
+    ])
+    for item in readings:
+        readings_sheet.append([
+            item.get("id"),
+            item.get("reading_uuid"),
+            _local_datetime(item.get("created_at")),
+            item.get("scenario"),
+            item.get("volume_m3"),
+            item.get("capacity_percent"),
+            item.get("confidence_percent"),
+            item.get("valid_zones"),
+            item.get("status"),
+        ])
+
+    anomalies_sheet = workbook.create_sheet("Tratativas")
+    anomalies_sheet.append([
+        "ID",
+        "Data e hora",
+        "Tipo",
+        "Severidade",
+        "Status",
+        "Mensagem",
+    ])
+    for item in anomalies:
+        anomalies_sheet.append([
+            item.get("id"),
+            _local_datetime(item.get("created_at")),
+            item.get("anomaly_type"),
+            item.get("severity"),
+            item.get("status"),
+            item.get("message"),
+        ])
+
+    output = BytesIO()
+    workbook.save(output)
     return output.getvalue()

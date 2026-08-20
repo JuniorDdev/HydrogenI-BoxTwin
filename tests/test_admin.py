@@ -90,3 +90,27 @@ def test_recipient_rule_detail_and_twilio_reply(tmp_path):
     assert reply.status_code == 200
     detail = client.get(f"/api/admin/anomalies/{anomaly_id}").get_json()
     assert detail["anomaly"]["status"] == "in_progress"
+
+
+def test_admin_sync_status(tmp_path):
+    client = make_client(tmp_path)
+    login(client)
+    response = client.get("/api/admin/sync-status")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["pending"] == 0
+    assert payload["synced"] == 0
+    assert payload["enabled"] is False
+
+
+def test_duplicate_notification_rule_is_reused(tmp_path):
+    client = make_client(tmp_path)
+    login(client)
+    recipient = client.post("/api/admin/recipients", json={"name": "Operação", "email": "operacao@example.com"}).get_json()
+    rule = {"anomaly_type": "*", "severity": "*", "recipient_id": recipient["id"], "channel": "email", "escalation_minutes": 0}
+    first = client.post("/api/admin/rules", json=rule)
+    second = client.post("/api/admin/rules", json=rule)
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.get_json()["id"] == second.get_json()["id"]
+    assert len(client.get("/api/admin/rules").get_json()) == 1

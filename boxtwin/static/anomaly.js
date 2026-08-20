@@ -1,7 +1,97 @@
-const $=id=>document.getElementById(id);let detail;
-const safe=v=>String(v??'—').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-async function api(url,options={}){const r=await fetch(url,options);const d=await r.json();if(r.status===401){location.href='/login';throw new Error('Sessão expirada');}if(!r.ok)throw new Error(d.error||'Falha');return d;}
-function renderGrid(reading){const box=$('incidentGrid');box.innerHTML='';(reading?.height_grid_m||[]).flat().forEach(v=>{const c=document.createElement('div');c.className='cell';c.textContent=(v*100).toFixed(1);c.style.opacity=.45+Math.min(1,v/(reading.maximum_height_m||1))*.55;box.appendChild(c);});}
-async function load(){detail=await api(`/api/admin/anomalies/${window.ANOMALY_ID}`);const a=detail.anomaly,r=detail.reading;$('incidentSummary').innerHTML=`<div><span class="eyebrow">${safe(a.severity)} · ${safe(a.status)}</span><h2>${safe(a.message)}</h2><p>${new Date(a.created_at).toLocaleString('pt-BR')} · ${safe(r?.node_id)}</p></div>`;$('readingDetail').innerHTML=`<div><small>Ocupação</small><b>${r?.capacity_percent??'—'}%</b></div><div><small>Volume</small><b>${r?.volume_m3??'—'} m³</b></div><div><small>Confiança</small><b>${r?.confidence_percent??'—'}%</b></div><div><small>Zonas válidas</small><b>${r?.valid_zones??'—'}/64</b></div>`;renderGrid(r);$('timeline').innerHTML=[{created_at:a.created_at,actor:'BoxTwin',event_type:'detected',note:a.message},...detail.events].map(e=>`<div class="timeline-event"><b>${safe(e.event_type)}</b><span>${safe(e.actor)}</span><small>${new Date(e.created_at).toLocaleString('pt-BR')}</small><p>${safe(e.note)}</p></div>`).join('');}
-$('statusForm').onsubmit=async e=>{e.preventDefault();await api(`/api/admin/anomalies/${window.ANOMALY_ID}/status`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:$('incidentStatus').value,note:$('incidentNote').value})});await load();};
-$('suggestTreatment').onclick=async()=>{const a=detail.anomaly,r=detail.reading;$('treatment').textContent='Analisando…';const result=await api('/api/admin/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:`Como tratar ${a.anomaly_type}: ${a.message}?`,context:r})});$('treatment').innerHTML=`<p>${safe(result.answer)}</p><small>Modo: ${safe(result.mode)} · Fontes: ${result.sources.map(s=>safe(s.id)).join(', ')}</small>`;};load();
+const $ = id => document.getElementById(id);
+let detail;
+
+const safe = value => String(value ?? '—').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
+
+async function api(url, options = {}) {
+  const response = await fetch(url, options);
+  const data = await response.json();
+  if (response.status === 401) {
+    location.href = '/login';
+    throw new Error('Sessão expirada');
+  }
+  if (!response.ok) throw new Error(data.error || 'Falha');
+  return data;
+}
+
+function renderGrid(reading) {
+  const box = $('incidentGrid');
+  box.innerHTML = '';
+  (reading?.height_grid_m || []).flat().forEach(value => {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.textContent = (value * 100).toFixed(1);
+    cell.style.opacity = .45 + Math.min(1, value / (reading.maximum_height_m || 1)) * .55;
+    box.appendChild(cell);
+  });
+}
+
+async function load() {
+  detail = await api(`/api/admin/anomalies/${window.ANOMALY_ID}`);
+  const anomaly = detail.anomaly;
+  const reading = detail.reading;
+  $('incidentSummary').innerHTML = `<div><span class="eyebrow">${safe(anomaly.severity)} · ${safe(anomaly.status)}</span><h2>${safe(anomaly.message)}</h2><p>${new Date(anomaly.created_at).toLocaleString('pt-BR')} · ${safe(reading?.node_id)}</p></div>`;
+  $('readingDetail').innerHTML = `
+    <div><small>Ocupação</small><b>${reading?.capacity_percent ?? '—'}%</b></div>
+    <div><small>Volume</small><b>${reading?.volume_m3 ?? '—'} m³</b></div>
+    <div><small>Confiança</small><b>${reading?.confidence_percent ?? '—'}%</b></div>
+    <div><small>Zonas válidas</small><b>${reading?.valid_zones ?? '—'}/64</b></div>
+  `;
+  renderGrid(reading);
+  $('timeline').innerHTML = [{created_at: anomaly.created_at, actor: 'BoxTwin', event_type: 'detected', note: anomaly.message}, ...detail.events]
+    .map(event => `<div class="timeline-event"><b>${safe(event.event_type)}</b><span>${safe(event.actor)}</span><small>${new Date(event.created_at).toLocaleString('pt-BR')}</small><p>${safe(event.note)}</p></div>`)
+    .join('');
+}
+
+$('statusForm').onsubmit = async event => {
+  event.preventDefault();
+  await api(`/api/admin/anomalies/${window.ANOMALY_ID}/status`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: $('incidentStatus').value, note: $('incidentNote').value}),
+  });
+  await load();
+};
+
+$('suggestTreatment').onclick = async () => {
+  const anomaly = detail.anomaly;
+  const reading = detail.reading;
+  $('treatment').textContent = 'Analisando…';
+  const result = await api('/api/admin/assistant', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question: `Como tratar ${anomaly.anomaly_type}: ${anomaly.message}?`, context: reading}),
+  });
+  $('treatment').innerHTML = `<p>${safe(result.answer)}</p><small>Modo: ${safe(result.mode)} · Fontes: ${result.sources.map(source => safe(source.id)).join(', ')}</small>`;
+};
+
+$('verifyButton').onclick = async () => {
+  const anomaly = detail.anomaly;
+  const reading = detail.reading;
+  $('treatment').textContent = 'Verificando tratativa…';
+  if (anomaly.status === 'open') {
+    await api(`/api/admin/anomalies/${window.ANOMALY_ID}/acknowledge`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({note: 'Ocorrência verificada na página de detalhe.'}),
+    });
+  }
+  const result = await api('/api/admin/assistant', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({question: `Quero verificar a anomalia ${anomaly.anomaly_type}. Passe a tratativa e as verificações práticas para esta ocorrência: ${anomaly.message}.`, context: reading}),
+  });
+  $('treatment').innerHTML = `<p>${safe(result.answer)}</p><small>Modo: ${safe(result.mode)} · Fontes: ${result.sources.map(source => safe(source.id)).join(', ')}</small>`;
+  await load();
+};
+
+$('treatedButton').onclick = async () => {
+  await api(`/api/admin/anomalies/${window.ANOMALY_ID}/status`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: 'resolved', note: 'Ocorrência verificada e tratada na página de detalhe.'}),
+  });
+  await load();
+};
+
+load();
