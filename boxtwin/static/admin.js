@@ -7,6 +7,7 @@ let lastSoundAlertId = null;
 let reminderIntervalId = null;
 let lastReminderAlertId = null;
 let anomaliesById = new Map();
+const reminderDelayMs = 45000;
 
 async function api(url, options = {}) {
   const response = await fetch(url, options);
@@ -78,7 +79,7 @@ function startReminderLoop(item) {
       'error',
       5000,
     );
-  }, 30000);
+  }, reminderDelayMs);
 }
 
 function renderSummary(summary) {
@@ -110,7 +111,8 @@ function renderAnomalies(items) {
 
 function renderActiveAlertSignal(items) {
   const banner = $('adminAlertBanner');
-  const first = items[0];
+  const seen = new Set(acknowledgedAlerts());
+  const first = items.find(item => !seen.has(item.id));
   if (!first) {
     banner.hidden = true;
     banner.className = 'panel alert-signal';
@@ -128,7 +130,6 @@ function renderActiveAlertSignal(items) {
     lastSoundAlertId = first.id;
   }
   startReminderLoop(first);
-  const seen = new Set(acknowledgedAlerts());
   const pendingHuman = items.find(item => item.status === 'open' && !seen.has(item.id));
   if (pendingHuman) openInterventionModal(pendingHuman);
 }
@@ -148,7 +149,7 @@ function openInterventionModal(item) {
       await api(`/api/admin/anomalies/${item.id}/acknowledge`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({note:'Leitura da tratativa confirmada no painel administrativo.'})});
       markAlertSeen(item.id);
       $('interventionModal').hidden = true;
-      showToast('Ciência da anomalia registrada. O alerta segue visível no painel.', 'success');
+      showToast('Ciência da anomalia registrada. O aviso some do painel e a ocorrência segue na fila até ser tratada.', 'success');
       await loadAdmin();
     } catch (error) {
       showToast(error.message, 'error');

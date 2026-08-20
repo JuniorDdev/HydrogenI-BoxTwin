@@ -26,26 +26,42 @@
         </div>
       </div>
       <div id="reportList" class="incident-list"></div>
+      <div id="reportPagination" class="pagination"></div>
     </section>
   </main>
   <script>
     const reportList = document.getElementById('reportList');
+    const reportPagination = document.getElementById('reportPagination');
     const escapeHtml = text => String(text ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
     const statusLabels = {resolved:'Resolvida', false_positive:'Falso positivo'};
     const typeLabels = {capacity:'Capacidade', confidence:'Baixa confiança', obstruction:'Obstrução'};
+    const pageSize = 10;
+    let reportItems = [];
     function localDate(value) {
       return value ? new Date(value).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) : '-';
     }
-    async function loadReports() {
-      const response = await fetch('/api/admin/reports/summary?limit=200');
-      const data = await response.json();
-      reportList.innerHTML = data.items.length ? data.items.map(item => `
+    function renderPage(page) {
+      const totalPages = Math.max(1, Math.ceil(reportItems.length / pageSize));
+      const safePage = Math.min(Math.max(page, 1), totalPages);
+      const pageItems = reportItems.slice((safePage - 1) * pageSize, safePage * pageSize);
+      reportList.innerHTML = pageItems.length ? pageItems.map(item => `
         <article class="incident">
           <div><b>#${item.id} · ${escapeHtml(item.message)}</b><small>${localDate(item.created_at)} · ${escapeHtml(typeLabels[item.anomaly_type] || item.anomaly_type)}</small></div>
           <span class="badge status-badge status-${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status] || item.status)}</span>
         </article>
       `).join('') : '<p class="muted">Nenhuma tratativa arquivada ainda.</p>';
+      reportPagination.innerHTML = Array.from({length: totalPages}, (_, index) => {
+        const pageNumber = index + 1;
+        return `<button class="${pageNumber === safePage ? 'active' : ''}" onclick="renderPage(${pageNumber})" type="button">${pageNumber}</button>`;
+      }).join('');
     }
+    async function loadReports() {
+      const response = await fetch('/api/admin/reports/summary?limit=200');
+      const data = await response.json();
+      reportItems = data.items || [];
+      renderPage(1);
+    }
+    window.renderPage = renderPage;
     loadReports();
   </script>
 </body>

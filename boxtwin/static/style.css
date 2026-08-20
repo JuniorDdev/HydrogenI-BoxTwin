@@ -49,6 +49,9 @@ main{padding-bottom:96px}
 .assistant-chat-form button{width:auto;margin:0;padding:11px 14px}
 .assistant-chat .assistant-meta{padding:0 16px 12px}
 .assistant-backdrop{display:none;position:fixed;inset:0;background:#04101d5c;z-index:940}
+.pagination{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:18px}
+.pagination button{width:auto;margin:0;padding:9px 12px;border:1px solid #c7d8e8;border-radius:10px;background:#fff;color:#28536f;font-weight:800}
+.pagination button.active{background:#1769ff;color:#fff;border-color:#1769ff}
 @media(max-width:760px){.assistant-backdrop.visible{display:block}}
 @media(max-width:480px){.assistant-widget{right:14px;bottom:14px}.assistant-chat{right:14px;left:14px;bottom:84px;width:auto;max-height:min(70vh,600px)}}
 @media(max-width:980px){.landing-menu{gap:12px}.landing-hero{grid-template-columns:1fr;gap:45px;padding-top:45px}.product-stage{width:min(620px,100%);margin:0 auto}.problem-grid{grid-template-columns:1fr 1fr}.problem-grid .solution-card{grid-column:1/-1}.capabilities-section{grid-template-columns:1fr}.architecture-callout{grid-template-columns:1fr}.landing-copy h1 em{display:inline}}

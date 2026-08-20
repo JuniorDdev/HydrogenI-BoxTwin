@@ -1,0 +1,15 @@
+{"kind":"deck","id":"pr/6wi3qp","name":"Deck"}
+{"kind":"layout","layoutId":"cc0c53b3-1d00-4515-88f1-8d005ac6fb68","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"83139853-f2a6-4744-a68f-d590fb2706c2","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/yfvmz2","slide":1,"title":"MENTORIA DIA 1 · TURMA B · 20/08/2026","textShapes":8}
+{"kind":"shape","id":"sh/sva1knqt","slide":1,"name":"top-rule","bbox":[72,56,1136,8]}
+{"kind":"textbox","id":"sh/ru10rip8","slide":1,"text":"MENTORIA DIA 1 · TURMA B · 20/08/2026","textPreview":"MENTORIA DIA 1 · TURMA B · 20/08/2026","textChars":37,"textLines":1,"bbox":[72,80,320,28]}
+{"kind":"textbox","id":"sh/69sjid8n","slide":1,"text":"HydrogenI automatiza a medição do box e já demonstra o fluxo operacional do MVP","textPreview":"HydrogenI automatiza a medição do box e já demonstra o fluxo operacional do MVP","textChars":79,"textLines":1,"bbox":[72,128,700,130]}
+{"kind":"textbox","id":"sh/103ixs7a","slide":1,"text":"Hoje mostramos o protótipo funcional e buscamos validar precisão, contexto operacional e próximos requisitos do ambiente real.","textPreview":"Hoje mostramos o protótipo funcional e buscamos validar precisão, contexto operacional e próximos requisitos do ambiente real.","textChars":126,"textLines":1,"bbox":[72,262,520,96]}
+{"kind":"textbox","id":"sh/gzu1o7qp","slide":1,"text":"O que já conseguimos provar","textPreview":"O que já conseguimos provar","textChars":27,"textLines":1,"bbox":[72,392,320,64]}
+{"kind":"textbox","id":"sh/fyl0v2p4","slide":1,"text":"• Leitura simulada do box com cálculo de ocupação e volume\n• Painel local e painel administrativo com alertas e tratativas\n• Histórico de medições, exportação em PDF/Excel e base Raspberry + Railway","textPreview":"• Leitura simulada do box com cálculo de ocupação e volume | • Painel local e painel administrativo com alertas e tratativas | • Históric...","textChars":198,"textLines":3,"bbox":[72,460,500,170]}
+{"kind":"shape","id":"sh/excjmx8z","slide":1,"name":"question-panel","bbox":[660,144,478,444]}
+{"kind":"textbox","id":"sh/p4321c7m","slide":1,"text":"O que queremos validar hoje","textPreview":"O que queremos validar hoje","textChars":27,"textLines":1,"bbox":[692,174,390,42]}
+{"kind":"textbox","id":"sh/o3u1s7q1","slide":1,"text":"1. Qual precisão mínima é aceitável para operação real?\n2. O acompanhamento precisa ser em m³, toneladas ou ambos?\n3. Como poeira, máquinas e rede local afetam a implantação no box?","textPreview":"1. Qual precisão mínima é aceitável para operação real? | 2. O acompanhamento precisa ser em m³, toneladas ou ambos? | 3. Como poeira, má...","textChars":181,"textLines":3,"bbox":[692,232,388,270]}
+{"kind":"textbox","id":"sh/u543uxw7","slide":1,"text":"Próximo passo do time: conectar sensor real e validar no ambiente físico.","textPreview":"Próximo passo do time: conectar sensor real e validar no ambiente físico.","textChars":73,"textLines":1,"bbox":[692,522,388,46]}
+{"kind":"notes","id":"nt/yfvmz2","slide":1,"text":""}

@@ -6,6 +6,7 @@ const statusLabels = {open:'Aberta', acknowledged:'Ciente', in_progress:'Em aten
 let lastSoundAlertId = null;
 let reminderIntervalId = null;
 let lastReminderAlertId = null;
+const reminderDelayMs = 45000;
 
 const viewState = {
   rotationY: Math.PI / 4,
@@ -81,7 +82,7 @@ function startReminderLoop(item) {
       'error',
       5000,
     );
-  }, 30000);
+  }, reminderDelayMs);
 }
 
 function renderGrid(data) {
@@ -233,7 +234,8 @@ function setActiveScenario(id) {
 
 function renderAlertSignal() {
   const banner = $('simAlertBanner');
-  const first = state.activeAlerts[0];
+  const seen = new Set(acknowledgedAlerts());
+  const first = state.activeAlerts.find(item => !seen.has(item.id));
   if (!first) {
     banner.hidden = true;
     banner.className = 'panel alert-signal';
@@ -251,7 +253,6 @@ function renderAlertSignal() {
     lastSoundAlertId = first.id;
   }
   startReminderLoop(first);
-  const seen = new Set(acknowledgedAlerts());
   const pendingHuman = state.activeAlerts.find(item => item.status === 'open' && !seen.has(item.id));
   if (pendingHuman) openInterventionModal(pendingHuman);
 }
@@ -282,7 +283,7 @@ function openInterventionModal(item) {
     try {
       markAlertSeen(item.id);
       $('interventionModal').hidden = true;
-      showToast('Leitura da tratativa confirmada no simulador. O aviso seguirá visível até a resolução no painel.', 'success');
+      showToast('Leitura da tratativa confirmada no simulador. O aviso some da tela e a tratativa segue no painel.', 'success');
       renderAlertSignal();
     } catch (error) {
       showToast(error.message, 'error');
@@ -407,6 +408,19 @@ $('setup').onclick = async () => {
   const data=await request('/api/demo/setup',{method:'POST'});
   render(data.reading);
   await Promise.all([loadHistory(), loadActiveAlerts()]);
+};
+
+$('stopDemo').onclick = async () => {
+  try {
+    const data = await request('/api/demo/scenario/empty', {method:'POST'});
+    render(data);
+    state.activeAlerts.forEach(item => markAlertSeen(item.id));
+    $('interventionModal').hidden = true;
+    await Promise.all([loadHistory(), loadActiveAlerts()]);
+    showToast('Demonstração pausada e box retornado ao cenário vazio.', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
 };
 
 $('capture').onclick = async () => {
