@@ -129,7 +129,13 @@ class NotificationService:
         req = request.Request(
             "https://api.resend.com/emails",
             data=payload,
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {cfg['RESEND_API_KEY']}"},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {cfg['RESEND_API_KEY']}",
+                # Sem um User-Agent explicito, a Cloudflare na frente da API da Resend bloqueia a
+                # requisicao (error code: 1010) por parecer trafego de bot vindo do urllib padrao.
+                "User-Agent": "HydrogenI-BoxTwin/1.0 (+https://github.com/JuniorDdev/HydrogenI-BoxTwin)",
+            },
         )
         try:
             with request.urlopen(req, timeout=10) as response:
