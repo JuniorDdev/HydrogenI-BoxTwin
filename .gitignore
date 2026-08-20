@@ -33,3 +33,7 @@ Thumbs.db
 # Arquivos do editor
 .vscode/
 .idea/
+
+# Artefatos temporários gerados pelo Codex/apresentações
+.codex_tmp_*/
+*.inspect.ndjson
