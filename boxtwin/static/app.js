@@ -280,11 +280,10 @@ function openInterventionModal(item) {
   $('interventionConfirm').onclick = async () => {
     $('interventionConfirm').disabled = true;
     try {
-      await request(`/api/admin/anomalies/${item.id}/acknowledge`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({note:'Leitura da tratativa confirmada no simulador.'})});
       markAlertSeen(item.id);
       $('interventionModal').hidden = true;
-      showToast('Ciência da anomalia registrada. O aviso seguirá fixo até a resolução.', 'success');
-      await loadActiveAlerts();
+      showToast('Leitura da tratativa confirmada no simulador. O aviso seguirá visível até a resolução no painel.', 'success');
+      renderAlertSignal();
     } catch (error) {
       showToast(error.message, 'error');
     } finally {
