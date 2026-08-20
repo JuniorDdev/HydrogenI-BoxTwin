@@ -167,12 +167,23 @@ class NotificationService:
             raise RuntimeError("Configuração Twilio incompleta.")
         endpoint = f"https://api.twilio.com/2010-04-01/Accounts/{cfg['TWILIO_ACCOUNT_SID']}/Messages.json"
         link = f"{cfg['PUBLIC_BASE_URL']}/admin/anomalies/{anomaly['id']}"
-        payload = parse.urlencode({"From": cfg["TWILIO_FROM"], "To": destination, "Body": f"⚠ BoxTwin #{anomaly['id']}: {anomaly['message']}\nResponda '1 {anomaly['id']}' para ciência ou '2 {anomaly['id']}' para atendimento.\n{link}", "StatusCallback": f"{cfg['PUBLIC_BASE_URL']}/api/webhooks/twilio/status"}).encode()
-        req = request.Request(endpoint, data=payload)
+        payload = parse.urlencode({"From": cfg["TWILIO_FROM"], "To": destination, "Body": f"⚠ BoxTwin #{anomaly['id']}: {anomaly['message']}\nResponda '1 {anomaly['id']}' para ciência, '2 {anomaly['id']}' para atendimento ou '3 {anomaly['id']}' para resolver.\n{link}", "StatusCallback": f"{cfg['PUBLIC_BASE_URL']}/api/webhooks/twilio/status"}).encode()
+        req = request.Request(endpoint, data=payload, headers={"Content-Type": "application/x-www-form-urlencoded"})
         token = __import__("base64").b64encode(f"{cfg['TWILIO_ACCOUNT_SID']}:{cfg['TWILIO_AUTH_TOKEN']}".encode()).decode()
         req.add_header("Authorization", f"Basic {token}")
-        with request.urlopen(req, timeout=10) as response:
-            return json.loads(response.read().decode()).get("sid")
+        try:
+            with request.urlopen(req, timeout=10) as response:
+                return json.loads(response.read().decode()).get("sid")
+        except urlerror.HTTPError as exc:
+            raw_detail = exc.read().decode(errors="replace")[:500]
+            try:
+                provider_error = json.loads(raw_detail)
+                code = provider_error.get("code")
+                message = provider_error.get("message") or raw_detail
+                detail = f"código {code}: {message}" if code else message
+            except json.JSONDecodeError:
+                detail = raw_detail
+            raise RuntimeError(f"Falha Twilio ({exc.code}): {detail}") from exc
 
 
 class EdgeSyncService:
