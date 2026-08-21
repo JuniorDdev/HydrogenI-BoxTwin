@@ -352,6 +352,42 @@ def valid_edge_token():
     return hmac.compare_digest(provided, configured)
 
 
+def parse_twilio_action(form):
+    incoming = (
+        form.get("ButtonPayload", "").strip()
+        or form.get("Body", "").strip()
+        or form.get("ButtonText", "").strip()
+    )
+    normalized = incoming.lower()
+    button_match = re.fullmatch(r"(ack|in_progress|resolved)_(\d+)", incoming, re.IGNORECASE)
+    if button_match:
+        return {
+            "ack": "acknowledged",
+            "in_progress": "in_progress",
+            "resolved": "resolved",
+        }[button_match.group(1).lower()], int(button_match.group(2))
+
+    command_match = re.fullmatch(r"([123])\s+(\d+)", incoming)
+    if command_match:
+        return {"1": "acknowledged", "2": "in_progress", "3": "resolved"}[command_match.group(1)], int(command_match.group(2))
+
+    action = None
+    if re.search(r"\b(ok|ciente|confirmo|confirmado|visto|ciência|ciencia)\b", normalized):
+        action = "acknowledged"
+    elif re.search(r"\b(atendimento|atender|tratando|andamento|progresso)\b", normalized):
+        action = "in_progress"
+    elif re.search(r"\b(resolvido|resolvida|tratado|tratada|finalizado|finalizada)\b", normalized):
+        action = "resolved"
+
+    id_match = re.search(r"#\s*(\d+)|\b(?:id|alerta|boxtwin)\s*(\d+)\b", normalized)
+    anomaly_id = int(next(group for group in id_match.groups() if group)) if id_match else None
+    if action and anomaly_id is None:
+        active = runtime().database.anomalies(2, "active")
+        if len(active) == 1:
+            anomaly_id = active[0]["id"]
+    return action, anomaly_id
+
+
 @bp.post("/api/webhooks/twilio/status")
 def twilio_status():
     if not valid_twilio_signature():
@@ -365,38 +401,25 @@ def twilio_status():
 def twilio_incoming():
     if not valid_twilio_signature():
         return "Assinatura inválida.", 403
-    # Quick Reply envia o ID oculto em ButtonPayload. Mantemos Body como
-    # fallback para SMS, mensagens digitadas e templates sem payload.
-    # Status internos ficam em inglês no banco; a confirmação ao operador fica em português.
     status_labels_pt = {"acknowledged": "ciente", "in_progress": "em atendimento", "resolved": "tratado"}
-    incoming = (
-        request.form.get("ButtonPayload", "").strip()
-        or request.form.get("Body", "").strip()
-        or request.form.get("ButtonText", "").strip()
-    )
-    action = None
-    anomaly_id = None
-    button_match = re.fullmatch(r"(ack|in_progress|resolved)_(\d+)", incoming, re.IGNORECASE)
-    if button_match:
-        action = {
-            "ack": "acknowledged",
-            "in_progress": "in_progress",
-            "resolved": "resolved",
-        }[button_match.group(1).lower()]
-        anomaly_id = int(button_match.group(2))
-    else:
-        command_match = re.fullmatch(r"([123])\s+(\d+)", incoming)
-        if command_match:
-            action = {"1": "acknowledged", "2": "in_progress", "3": "resolved"}[command_match.group(1)]
-            anomaly_id = int(command_match.group(2))
-
+    next_step = {"open": "acknowledged", "acknowledged": "in_progress", "in_progress": "resolved"}
+    action, anomaly_id = parse_twilio_action(request.form)
     if not action or anomaly_id is None:
-        reply = "Formato inválido. Responda 1 ID para ciência, 2 ID para atendimento ou 3 ID para resolver."
+        reply = "Não consegui identificar a tratativa. Responda: ciente 34, atendimento 34 ou resolvido 34."
     else:
-        sender = request.form.get("From", "Responsável via Twilio")
-        found = runtime().database.update_anomaly_status(anomaly_id, action, "Atualização recebida pelo WhatsApp/SMS.", sender)
-        status_pt = status_labels_pt.get(action, action)
-        reply = f"BoxTwin #{anomaly_id} atualizado para {status_pt}." if found else "Anomalia não encontrada."
+        detail = runtime().database.anomaly_detail(anomaly_id)
+        if not detail:
+            reply = "Anomalia não encontrada."
+        elif detail["anomaly"]["status"] in {"resolved", "false_positive"}:
+            reply = f"BoxTwin #{anomaly_id} já está tratado."
+        elif next_step.get(detail["anomaly"]["status"]) != action:
+            expected = status_labels_pt[next_step[detail["anomaly"]["status"]]]
+            reply = f"Para manter o fluxo correto, o próximo passo do BoxTwin #{anomaly_id} é: {expected}."
+        else:
+            sender = request.form.get("From", "Responsável via Twilio")
+            runtime().database.update_anomaly_status(anomaly_id, action, "Atualização recebida pelo WhatsApp/SMS.", sender)
+            status_pt = status_labels_pt.get(action, action)
+            reply = f"BoxTwin #{anomaly_id} atualizado para {status_pt}. Próximo passo: {status_labels_pt.get(next_step.get(action), 'acompanhar no painel')}."
     escaped = reply.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     return f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>{escaped}</Message></Response>', 200, {"Content-Type": "application/xml"}
 

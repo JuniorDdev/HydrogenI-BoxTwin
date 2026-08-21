@@ -89,6 +89,19 @@ def test_recipient_rule_detail_and_twilio_reply(tmp_path):
     reply = client.post("/api/webhooks/twilio/incoming", data={"Body": f"2 {anomaly_id}", "From": "whatsapp:+5598999999999"})
     assert reply.status_code == 200
     detail = client.get(f"/api/admin/anomalies/{anomaly_id}").get_json()
+    assert detail["anomaly"]["status"] == "open"
+
+    reply = client.post(
+        "/api/webhooks/twilio/incoming",
+        data={"Body": f"Alerta BoxTwin #{anomaly_id}\nCapacidade próxima do limite.\nCiente", "From": "whatsapp:+5598999999999"},
+    )
+    assert reply.status_code == 200
+    detail = client.get(f"/api/admin/anomalies/{anomaly_id}").get_json()
+    assert detail["anomaly"]["status"] == "acknowledged"
+
+    reply = client.post("/api/webhooks/twilio/incoming", data={"Body": f"2 {anomaly_id}", "From": "whatsapp:+5598999999999"})
+    assert reply.status_code == 200
+    detail = client.get(f"/api/admin/anomalies/{anomaly_id}").get_json()
     assert detail["anomaly"]["status"] == "in_progress"
 
     button_reply = client.post(
