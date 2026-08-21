@@ -367,23 +367,29 @@ def parse_twilio_action(form):
             "resolved": "resolved",
         }[button_match.group(1).lower()], int(button_match.group(2))
 
-    command_match = re.fullmatch(r"([123])\s+(\d+)", incoming)
+    command_match = re.fullmatch(r"([123])(?:\s+(\d+))?", incoming)
     if command_match:
-        return {"1": "acknowledged", "2": "in_progress", "3": "resolved"}[command_match.group(1)], int(command_match.group(2))
+        action = {"1": "acknowledged", "2": "in_progress", "3": "resolved"}[command_match.group(1)]
+        anomaly_id = int(command_match.group(2)) if command_match.group(2) else None
+        if anomaly_id is None:
+            active = runtime().database.anomalies(1, "active")
+            if active:
+                anomaly_id = active[0]["id"]
+        return action, anomaly_id
 
     action = None
-    if re.search(r"\b(ok|ciente|confirmo|confirmado|visto|ciência|ciencia)\b", normalized):
+    if re.search(r"\b(1|ok|atendido|atendida|ciente|confirmo|confirmado|visto|ciência|ciencia)\b", normalized):
         action = "acknowledged"
-    elif re.search(r"\b(atendimento|atender|tratando|andamento|progresso)\b", normalized):
+    elif re.search(r"\b(2|atendimento|atender|tratando|andamento|progresso)\b", normalized):
         action = "in_progress"
-    elif re.search(r"\b(resolvido|resolvida|tratado|tratada|finalizado|finalizada)\b", normalized):
+    elif re.search(r"\b(3|resolvido|resolvida|tratado|tratada|finalizado|finalizada)\b", normalized):
         action = "resolved"
 
     id_match = re.search(r"#\s*(\d+)|\b(?:id|alerta|boxtwin)\s*(\d+)\b", normalized)
     anomaly_id = int(next(group for group in id_match.groups() if group)) if id_match else None
     if action and anomaly_id is None:
-        active = runtime().database.anomalies(2, "active")
-        if len(active) == 1:
+        active = runtime().database.anomalies(1, "active")
+        if active:
             anomaly_id = active[0]["id"]
     return action, anomaly_id
 
@@ -405,7 +411,7 @@ def twilio_incoming():
     next_step = {"open": "acknowledged", "acknowledged": "in_progress", "in_progress": "resolved"}
     action, anomaly_id = parse_twilio_action(request.form)
     if not action or anomaly_id is None:
-        reply = "Não consegui identificar a tratativa. Responda: ciente 34, atendimento 34 ou resolvido 34."
+        reply = "Não consegui identificar a tratativa. Responda 1 para atendido, 2 para em atendimento ou 3 para resolvido."
     else:
         detail = runtime().database.anomaly_detail(anomaly_id)
         if not detail:

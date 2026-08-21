@@ -113,6 +113,26 @@ def test_recipient_rule_detail_and_twilio_reply(tmp_path):
     assert detail["anomaly"]["status"] == "resolved"
 
 
+def test_twilio_reply_accepts_simple_options_without_id(tmp_path):
+    client = make_client(tmp_path)
+    login(client)
+    client.post("/api/demo/setup")
+    reading = client.post("/api/demo/scenario/full").get_json()
+    anomaly_id = reading["anomaly_ids"][0]
+
+    assert client.post("/api/webhooks/twilio/incoming", data={"Body": "1", "From": "whatsapp:+5598999999999"}).status_code == 200
+    detail = client.get(f"/api/admin/anomalies/{anomaly_id}").get_json()
+    assert detail["anomaly"]["status"] == "acknowledged"
+
+    assert client.post("/api/webhooks/twilio/incoming", data={"Body": "Em atendimento", "From": "whatsapp:+5598999999999"}).status_code == 200
+    detail = client.get(f"/api/admin/anomalies/{anomaly_id}").get_json()
+    assert detail["anomaly"]["status"] == "in_progress"
+
+    assert client.post("/api/webhooks/twilio/incoming", data={"Body": "Resolvido", "From": "whatsapp:+5598999999999"}).status_code == 200
+    detail = client.get(f"/api/admin/anomalies/{anomaly_id}").get_json()
+    assert detail["anomaly"]["status"] == "resolved"
+
+
 def test_admin_sync_status(tmp_path):
     client = make_client(tmp_path)
     login(client)

@@ -205,8 +205,7 @@ class NotificationService:
             # Compatibilidade com ambientes que ainda não configuraram o template.
             message_data["Body"] = (
                 f"⚠ BoxTwin #{anomaly['id']}: {anomaly['message']}\n"
-                f"Responda '1 {anomaly['id']}' para ciência, '2 {anomaly['id']}' para atendimento "
-                f"ou '3 {anomaly['id']}' para resolver.\n{link}"
+                f"Responda 1 para atendido, 2 para em atendimento ou 3 para resolvido.\n{link}"
             )
         payload = parse.urlencode(message_data).encode()
         req = request.Request(endpoint, data=payload, headers={"Content-Type": "application/x-www-form-urlencoded"})
