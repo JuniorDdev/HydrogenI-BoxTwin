@@ -32,6 +32,11 @@ def admin_required(view):
 
 
 @bp.get("/")
+def group_landing():
+    return render_template("group.html")
+
+
+@bp.get("/projeto")
 def landing():
     return render_template("index.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
 
