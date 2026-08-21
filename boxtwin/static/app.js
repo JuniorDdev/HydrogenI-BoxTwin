@@ -3,6 +3,11 @@ const state = { latest: null, health: null, activeScenario: null, activeAlerts: 
 const alertStorageKey = 'boxtwin_intervention_seen_simulator';
 const typeLabels = {capacity:'Capacidade', confidence:'Baixa confiança', obstruction:'Obstrução'};
 const statusLabels = {open:'Aberta', acknowledged:'Ciente', in_progress:'Em atendimento', resolved:'Resolvida', false_positive:'Falso positivo'};
+const treatmentGuides = {
+  capacity: ['Confirmar ocupação no mapa 8 x 8.', 'Evitar nova carga neste box.', 'Acionar operação para retirada ou redistribuição.'],
+  confidence: ['Verificar poeira, vibração e iluminação.', 'Conferir sensor e área de leitura.', 'Repetir captura após inspeção.'],
+  obstruction: ['Pausar a medição automática.', 'Inspecionar janela/campo do sensor.', 'Limpar obstruções e capturar novamente.'],
+};
 let lastSoundAlertId = null;
 let reminderIntervalId = null;
 let lastReminderAlertId = null;
@@ -259,25 +264,14 @@ function renderAlertSignal() {
 
 function openInterventionModal(item) {
   $('interventionTitle').textContent = `${typeLabels[item.anomaly_type] || item.anomaly_type} exige atenção`;
-  $('interventionText').textContent = `${item.message} Vou carregar a orientação de tratativa para apoiar sua decisão.`;
-  $('interventionDetails').innerHTML = `<div><b>Tratativa recomendada</b><small>Consultando procedimento operacional…</small></div>`;
+  $('interventionText').textContent = item.message;
+  const guide = treatmentGuides[item.anomaly_type] || ['Verificar a ocorrência no painel.', 'Registrar evidências.', 'Acionar responsável técnico.'];
+  $('interventionDetails').innerHTML = `
+    <div><b>Tratativa rápida</b><small>${guide.map((step, index) => `${index + 1}. ${step}`).join('<br>')}</small></div>
+    <div><b>Comunicação</b><small>${item.email_sent ? 'Cliente notificado.' : 'Envio ao cliente ainda não confirmado.'}</small></div>
+    <div><b>Horário</b><small>${new Date(item.created_at).toLocaleString('pt-BR')}</small></div>
+  `;
   $('interventionModal').hidden = false;
-  request('/api/admin/assistant', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({question:`Quero a tratativa operacional para ${item.anomaly_type}. Explique de forma humana e direta o que verificar e como tratar esta ocorrência: ${item.message}.`})
-  }).then(result => {
-    $('interventionDetails').innerHTML = `
-      <div><b>Tratativa recomendada</b><small>${result.answer}</small></div>
-      <div><b>Comunicação com o cliente</b><small>${item.email_sent ? 'E-mail de alerta enviado ao cliente.' : 'Envio de e-mail ainda não confirmado.'}</small></div>
-      <div><b>Horário do alerta</b><small>${new Date(item.created_at).toLocaleString('pt-BR')}</small></div>
-    `;
-  }).catch(error => {
-    $('interventionDetails').innerHTML = `
-      <div><b>Tratativa recomendada</b><small>Não consegui carregar a orientação automática agora. Registre a ocorrência e valide com um responsável técnico.</small></div>
-      <div><b>Detalhe</b><small>${error.message}</small></div>
-    `;
-  });
   $('interventionConfirm').onclick = async () => {
     $('interventionConfirm').disabled = true;
     try {
@@ -292,6 +286,10 @@ function openInterventionModal(item) {
     }
   };
 }
+
+$('interventionClose').onclick = () => {
+  $('interventionModal').hidden = true;
+};
 
 function render(data) {
   if (!data || !data.id) return;

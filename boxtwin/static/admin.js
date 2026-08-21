@@ -159,6 +159,10 @@ function openInterventionModal(item) {
   };
 }
 
+$('interventionClose').onclick = () => {
+  $('interventionModal').hidden = true;
+};
+
 async function loadAdmin() {
   try {
     const [summary, anomalies, notifications, recipients, rules, activeAlerts] = await Promise.all([
