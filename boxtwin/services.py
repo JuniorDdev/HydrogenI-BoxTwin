@@ -72,9 +72,20 @@ class AlertService:
 
 class NotificationService:
     """Adaptadores opcionais. Falhas externas nunca interrompem a medição."""
-    def __init__(self, config, database):
-        self.config, self.database = config, database
+    def __init__(self, config, database, rag=None):
+        self.config, self.database, self.rag = config, database, rag
         self.last_sent = {}
+
+    def _guidance_for(self, anomaly):
+        """Pré-análise e orientação de solução, a partir da mesma base de procedimentos usada pelo
+        assistente técnico — inclusa no corpo do e-mail para o destinatário já receber um próximo
+        passo, sem precisar abrir o painel."""
+        if not self.rag:
+            return "Consulte o procedimento técnico correspondente no painel administrativo."
+        sources = self.rag.retrieve(anomaly.get("message", ""), context={"type": anomaly.get("type")})
+        if not sources:
+            return "Nenhum procedimento específico foi encontrado; isole a ocorrência, registre evidências e acione um responsável técnico."
+        return sources[0]["content"]
 
     def dispatch(self, anomalies):
         results = []
@@ -134,7 +145,14 @@ class NotificationService:
         if not all((cfg["RESEND_API_KEY"], cfg["RESEND_FROM_EMAIL"], destination)):
             raise RuntimeError("Configuração Resend incompleta.")
         link = f"{cfg['PUBLIC_BASE_URL']}/admin/anomalies/{anomaly['id']}"
-        text = f"{anomaly['message']}\nSeveridade: {anomaly['level']}\nData: {anomaly['created_at']}\nAcompanhar: {link}"
+        guidance = self._guidance_for(anomaly)
+        text = (
+            f"{anomaly['message']}\n"
+            f"Severidade: {anomaly['level']}\n"
+            f"Data: {anomaly['created_at']}\n\n"
+            f"Pré-análise e orientação de solução:\n{guidance}\n\n"
+            f"Acompanhar: {link}"
+        )
         payload = json.dumps({
             "from": cfg["RESEND_FROM_EMAIL"],
             "to": [destination],

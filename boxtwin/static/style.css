@@ -92,3 +92,7 @@ main{padding-bottom:96px}
 .intervention-details b,.intervention-details small{display:block}
 .intervention-details small{margin-top:4px;color:#6f8095}
 @keyframes signalPulse{0%,100%{transform:translateY(0);box-shadow:0 0 0 0 #ef5b6722}50%{transform:translateY(-1px);box-shadow:0 0 0 10px #ef5b6700}}
+
+/* Botão Sair com destaque próprio (antes se confundia com os links de navegação) */
+.badge.logout{color:#ffd7d7;background:#5c1f28;border-color:#ef5b6759;font-weight:800}
+.badge.logout:hover{background:#712530;border-color:#ef5b67}

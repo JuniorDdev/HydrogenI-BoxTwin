@@ -16,9 +16,9 @@ class BoxTwinRuntime:
         self.calibration = CalibrationService(config["CALIBRATION_PATH"])
         self.volume = VolumeService(config["BOX_LENGTH_M"], config["BOX_WIDTH_M"], config["BOX_HEIGHT_M"])
         self.alerts = AlertService(config["CAPACITY_ALERT_PERCENT"], config["MIN_CONFIDENCE_PERCENT"])
-        self.notifications = NotificationService(config, database)
-        self.edge_sync = EdgeSyncService(config, database)
         self.rag = RagService(Path(__file__).parent / "knowledge" / "procedures.json")
+        self.notifications = NotificationService(config, database, self.rag)
+        self.edge_sync = EdgeSyncService(config, database)
         self.assistant = GroqService(config, self.rag)
         self._stop = threading.Event()
         self._thread = None
@@ -76,12 +76,12 @@ class BoxTwinRuntime:
         self._thread.start()
 
     def _loop(self):
+        # Captura e alerta acontecem só por requisição explícita (botão "Capturar" no simulador,
+        # POST /api/readings, ou sincronização de borda) — este laço de fundo NÃO chama self.capture()
+        # sozinho. Antes ele capturava automaticamente a cada SAMPLE_INTERVAL_SECONDS, o que gerava
+        # alertas/e-mails repetidos sem ninguém ter pedido. As tarefas de manutenção abaixo continuam
+        # rodando no mesmo intervalo.
         while not self._stop.is_set():
-            try:
-                if self.calibration.load() is not None:
-                    self.capture()
-            except Exception as exc:
-                print(f"[BoxTwin] Falha de leitura: {exc}")
             try:
                 self.notifications.dispatch_escalations()
             except Exception as exc:
