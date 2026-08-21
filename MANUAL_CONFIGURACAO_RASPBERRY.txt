@@ -1,0 +1,447 @@
+MANUAL DE CONFIGURAÇÃO DO RASPBERRY PI
+HYDROGENI BOXTWIN 3D
+Versão: 20/08/2026
+
+======================================================================
+1. OBJETIVO
+======================================================================
+
+Configurar o Raspberry Pi como BoxNode local do HydrogenI para:
+
+- executar o painel na rede interna;
+- capturar leituras continuamente;
+- armazenar leituras no SQLite;
+- continuar operando durante quedas da internet;
+- sincronizar leituras com o Railway quando a conexão voltar;
+- evitar perda e duplicação de leituras;
+- preparar a futura integração do sensor VL53L8CX.
+
+Arquitetura:
+
+Sensor -> Raspberry -> SQLite/fila offline -> Railway
+                  \-> painel na rede local
+
+IMPORTANTE: enquanto o sensor físico não estiver integrado, use
+SENSOR_MODE=mock.
+
+======================================================================
+2. PRÉ-REQUISITOS
+======================================================================
+
+- Raspberry Pi 4 ou 5;
+- Raspberry Pi OS 64-bit;
+- cartão ou SSD com espaço disponível;
+- Ethernet ou Wi-Fi configurado;
+- Python 3.11 ou superior;
+- acesso ao terminal;
+- URL pública do projeto no Railway;
+- EDGE_SYNC_TOKEN configurado no Railway.
+
+======================================================================
+3. ATUALIZAR O RASPBERRY
+======================================================================
+
+Execute:
+
+sudo apt update
+sudo apt full-upgrade -y
+sudo apt install -y git python3 python3-venv python3-pip
+sudo timedatectl set-timezone America/Sao_Paulo
+
+Verifique:
+
+python3 --version
+git --version
+timedatectl
+
+======================================================================
+4. CLONAR O PROJETO
+======================================================================
+
+Execute:
+
+cd /opt
+sudo git clone --branch main https://github.com/JuniorDdev/HydrogenI-BoxTwin.git boxtwin
+sudo chown -R "$USER":"$USER" /opt/boxtwin
+cd /opt/boxtwin
+
+Para atualizar o projeto futuramente:
+
+cd /opt/boxtwin
+git pull --ff-only origin main
+
+======================================================================
+5. CRIAR O AMBIENTE PYTHON
+======================================================================
+
+Execute:
+
+cd /opt/boxtwin
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+
+Para sair do ambiente virtual:
+
+deactivate
+
+======================================================================
+6. DESCOBRIR O IP DO RASPBERRY
+======================================================================
+
+Execute:
+
+hostname -I
+
+Exemplo de resposta:
+
+192.168.1.50
+
+Recomenda-se reservar esse endereço no roteador para que ele não mude.
+
+======================================================================
+7. CRIAR O ARQUIVO .env.raspberry
+======================================================================
+
+Execute:
+
+nano /opt/boxtwin/.env.raspberry
+
+Cole o modelo abaixo e altere os valores indicados.
+
+---------------- INÍCIO DO .env.raspberry ----------------
+
+APP_HOST=0.0.0.0
+APP_PORT=5000
+APP_DEBUG=false
+
+SENSOR_MODE=mock
+BOX_NODE_ID=BOX-RASP-01
+BOX_NAME=Box HydrogenI local
+BOX_LENGTH_M=0.60
+BOX_WIDTH_M=0.40
+BOX_HEIGHT_M=0.50
+SAMPLE_INTERVAL_SECONDS=5
+CAPACITY_ALERT_PERCENT=85
+MIN_CONFIDENCE_PERCENT=70
+
+DATABASE_PATH=data/boxtwin.db
+CALIBRATION_PATH=data/calibration.json
+
+SECRET_KEY=GERE_UMA_CHAVE_EXCLUSIVA_PARA_O_RASPBERRY
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=COLOQUE_UMA_SENHA_FORTE
+
+NOTIFY_COOLDOWN_SECONDS=3600
+
+EMAIL_ENABLED=false
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
+ALERT_EMAIL_TO=
+
+TWILIO_ENABLED=false
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM=
+TWILIO_TO=
+TWILIO_VALIDATE_SIGNATURE=true
+
+PUBLIC_BASE_URL=http://IP_DO_RASPBERRY:5000
+
+GROQ_ENABLED=false
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-120b
+GROQ_TIMEOUT_SECONDS=20
+
+EDGE_SYNC_ENABLED=true
+EDGE_SYNC_TARGET_URL=https://hydrogeni-boxtwin-production.up.railway.app
+EDGE_SYNC_TOKEN=COLOQUE_O_MESMO_TOKEN_CONFIGURADO_NO_RAILWAY
+EDGE_SYNC_TIMEOUT_SECONDS=15
+EDGE_SYNC_BATCH_SIZE=20
+
+AUTO_CLEANUP_ENABLED=true
+READINGS_RETENTION_DAYS=45
+NOTIFICATIONS_RETENTION_DAYS=60
+INCIDENTS_RETENTION_DAYS=180
+SYNC_QUEUE_RETENTION_DAYS=7
+
+------------------ FIM DO .env.raspberry -----------------
+
+Substitua obrigatoriamente:
+
+- IP_DO_RASPBERRY pelo endereço descoberto no passo 6;
+- SECRET_KEY por uma chave aleatória exclusiva;
+- ADMIN_PASSWORD por uma senha forte;
+- EDGE_SYNC_TOKEN pelo mesmo token privado usado no Railway.
+
+Regras importantes:
+
+- SECRET_KEY e EDGE_SYNC_TOKEN devem ser diferentes;
+- não coloque o arquivo .env.raspberry no GitHub;
+- no Raspberry, EDGE_SYNC_ENABLED deve ser true;
+- no Railway, EDGE_SYNC_ENABLED deve ser false;
+- o EDGE_SYNC_TOKEN deve ser idêntico nos dois ambientes;
+- o e-mail e o Twilio ficam desativados no Raspberry para evitar
+  notificações duplicadas;
+- o Railway deve centralizar notificações externas;
+- GROQ_ENABLED=false mantém o assistente no RAG local e offline.
+
+Para salvar no nano:
+
+CTRL+O
+ENTER
+CTRL+X
+
+Proteja o arquivo:
+
+chmod 600 /opt/boxtwin/.env.raspberry
+
+======================================================================
+8. TESTAR MANUALMENTE
+======================================================================
+
+Crie um link para o arquivo de ambiente:
+
+cd /opt/boxtwin
+ln -sfn .env.raspberry .env
+
+Execute a aplicação:
+
+source .venv/bin/activate
+python app.py
+
+Em outro terminal, teste:
+
+curl http://127.0.0.1:5000/api/health
+
+Em outro computador da mesma rede, abra:
+
+http://IP_DO_RASPBERRY:5000/
+http://IP_DO_RASPBERRY:5000/simulador
+http://IP_DO_RASPBERRY:5000/admin
+
+Para encerrar o teste manual:
+
+CTRL+C
+
+======================================================================
+9. CONFIGURAR O SERVIÇO AUTOMÁTICO
+======================================================================
+
+Descubra o usuário atual:
+
+whoami
+
+O arquivo systemd/boxtwin.service está configurado inicialmente para o
+usuário pi. Se o resultado de whoami for diferente, edite o arquivo:
+
+nano /opt/boxtwin/systemd/boxtwin.service
+
+Altere estas linhas:
+
+User=pi
+Group=pi
+
+Depois instale o serviço:
+
+cd /opt/boxtwin
+sudo cp systemd/boxtwin.service /etc/systemd/system/boxtwin.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now boxtwin
+
+Verifique:
+
+sudo systemctl status boxtwin
+
+Ver logs em tempo real:
+
+journalctl -u boxtwin -f
+
+Reiniciar o serviço:
+
+sudo systemctl restart boxtwin
+
+Parar o serviço:
+
+sudo systemctl stop boxtwin
+
+Iniciar o serviço:
+
+sudo systemctl start boxtwin
+
+======================================================================
+10. TESTAR A OPERAÇÃO OFFLINE
+======================================================================
+
+1. Confirme que o sistema está funcionando com internet.
+2. Abra o simulador pela rede local.
+3. Desconecte temporariamente a internet do Raspberry.
+4. Gere novas leituras no simulador.
+5. Confirme que o painel local continua funcionando.
+6. Reconecte a internet.
+7. Aguarde o processamento da fila.
+8. Confira se as leituras chegaram ao Railway.
+
+O fluxo esperado é:
+
+- leitura salva primeiro no SQLite local;
+- leitura recebe um reading_uuid único;
+- falha de internet mantém a leitura pendente;
+- reconexão dispara nova tentativa;
+- o Railway usa o UUID para impedir duplicação.
+
+O estado da sincronização pode ser consultado no painel administrativo ou
+pela rota autenticada:
+
+GET /api/admin/sync-status
+
+======================================================================
+11. RETENÇÃO E ARMAZENAMENTO
+======================================================================
+
+Configuração recomendada:
+
+READINGS_RETENTION_DAYS=45
+NOTIFICATIONS_RETENTION_DAYS=60
+INCIDENTS_RETENTION_DAYS=180
+SYNC_QUEUE_RETENTION_DAYS=7
+
+Verificar espaço disponível:
+
+df -h
+
+Verificar o tamanho dos dados:
+
+du -h /opt/boxtwin/data/*
+
+A limpeza automática não deve remover leituras que ainda estejam pendentes
+ou com falha de sincronização.
+
+======================================================================
+12. ATUALIZAR O SISTEMA DEPOIS
+======================================================================
+
+Execute:
+
+cd /opt/boxtwin
+sudo systemctl stop boxtwin
+git pull --ff-only origin main
+source .venv/bin/activate
+pip install -r requirements.txt
+sudo systemctl start boxtwin
+sudo systemctl status boxtwin
+
+Se o arquivo systemd tiver sido atualizado no GitHub:
+
+sudo cp systemd/boxtwin.service /etc/systemd/system/boxtwin.service
+sudo systemctl daemon-reload
+sudo systemctl restart boxtwin
+
+======================================================================
+13. PREPARAÇÃO DO SENSOR VL53L8CX
+======================================================================
+
+Enquanto o driver não estiver implementado:
+
+SENSOR_MODE=mock
+
+Não altere para vl53l8cx antes de concluir:
+
+1. instalação do driver da placa;
+2. configuração da comunicação I2C ou SPI;
+3. permissões do usuário do serviço;
+4. implementação de read_distance_grid_mm();
+5. retorno de uma matriz 8x8 em milímetros;
+6. tratamento de zonas inválidas como None;
+7. calibração com o box vazio;
+8. validação contra volumes físicos conhecidos.
+
+Depois da integração e validação:
+
+SENSOR_MODE=vl53l8cx
+
+Reinicie o serviço após a mudança:
+
+sudo systemctl restart boxtwin
+
+======================================================================
+14. DIAGNÓSTICO
+======================================================================
+
+SERVIÇO NÃO INICIA
+
+sudo systemctl status boxtwin
+journalctl -u boxtwin -n 100 --no-pager
+
+PAINEL NÃO ABRE NA REDE
+
+hostname -I
+ss -lntp | grep 5000
+
+Confirme no .env.raspberry:
+
+APP_HOST=0.0.0.0
+APP_PORT=5000
+
+ERRO 401 NA SINCRONIZAÇÃO
+
+- confira o EDGE_SYNC_TOKEN no Raspberry;
+- confira o EDGE_SYNC_TOKEN no Railway;
+- os dois valores devem ser idênticos;
+- reinicie o serviço depois de alterar.
+
+FILA NÃO DIMINUI
+
+- teste a internet;
+- confira EDGE_SYNC_TARGET_URL;
+- abra a rota /api/health do Railway;
+- examine journalctl -u boxtwin -f.
+
+BANCO OU DIRETÓRIO SEM PERMISSÃO
+
+sudo chown -R "$USER":"$USER" /opt/boxtwin
+mkdir -p /opt/boxtwin/data
+
+SERVIÇO EXECUTADO POR OUTRO USUÁRIO
+
+Confira User= e Group= em:
+
+/etc/systemd/system/boxtwin.service
+
+======================================================================
+15. SEGURANÇA
+======================================================================
+
+- não publique chaves ou senhas no GitHub;
+- não compartilhe o EDGE_SYNC_TOKEN;
+- não reutilize SECRET_KEY como EDGE_SYNC_TOKEN;
+- altere a senha padrão do administrador;
+- não exponha a porta 5000 diretamente à internet;
+- use o Railway ou uma VPN administrada para acesso externo;
+- mantenha o Raspberry e as dependências atualizados;
+- rotacione qualquer chave que tenha sido exposta.
+
+======================================================================
+16. CHECKLIST FINAL
+======================================================================
+
+[ ] Raspberry atualizado
+[ ] Projeto clonado da branch main
+[ ] Ambiente virtual criado
+[ ] Dependências instaladas
+[ ] .env.raspberry criado e protegido
+[ ] IP local reservado
+[ ] Painel acessível pela rede local
+[ ] Senha administrativa alterada
+[ ] SECRET_KEY exclusiva configurada
+[ ] EDGE_SYNC_TOKEN igual ao Railway
+[ ] EDGE_SYNC_ENABLED=true no Raspberry
+[ ] EDGE_SYNC_ENABLED=false no Railway
+[ ] Teste offline realizado
+[ ] Reconexão sincroniza sem duplicar
+[ ] Serviço inicia automaticamente
+[ ] Espaço em disco verificado
+[ ] SENSOR_MODE=mock até a integração física
+
+FIM DO MANUAL

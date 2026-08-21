@@ -72,9 +72,20 @@ class AlertService:
 
 class NotificationService:
     """Adaptadores opcionais. Falhas externas nunca interrompem a medição."""
-    def __init__(self, config, database):
-        self.config, self.database = config, database
+    def __init__(self, config, database, rag=None):
+        self.config, self.database, self.rag = config, database, rag
         self.last_sent = {}
+
+    def _guidance_for(self, anomaly):
+        """Pré-análise e orientação de solução, a partir da mesma base de procedimentos usada pelo
+        assistente técnico — inclusa no corpo do e-mail para o destinatário já receber um próximo
+        passo, sem precisar abrir o painel."""
+        if not self.rag:
+            return "Consulte o procedimento técnico correspondente no painel administrativo."
+        sources = self.rag.retrieve(anomaly.get("message", ""), context={"type": anomaly.get("type")})
+        if not sources:
+            return "Nenhum procedimento específico foi encontrado; isole a ocorrência, registre evidências e acione um responsável técnico."
+        return sources[0]["content"]
 
     def dispatch(self, anomalies):
         results = []
@@ -134,7 +145,14 @@ class NotificationService:
         if not all((cfg["RESEND_API_KEY"], cfg["RESEND_FROM_EMAIL"], destination)):
             raise RuntimeError("Configuração Resend incompleta.")
         link = f"{cfg['PUBLIC_BASE_URL']}/admin/anomalies/{anomaly['id']}"
-        text = f"{anomaly['message']}\nSeveridade: {anomaly['level']}\nData: {anomaly['created_at']}\nAcompanhar: {link}"
+        guidance = self._guidance_for(anomaly)
+        text = (
+            f"{anomaly['message']}\n"
+            f"Severidade: {anomaly['level']}\n"
+            f"Data: {anomaly['created_at']}\n\n"
+            f"Pré-análise e orientação de solução:\n{guidance}\n\n"
+            f"Acompanhar: {link}"
+        )
         payload = json.dumps({
             "from": cfg["RESEND_FROM_EMAIL"],
             "to": [destination],
@@ -167,7 +185,30 @@ class NotificationService:
             raise RuntimeError("Configuração Twilio incompleta.")
         endpoint = f"https://api.twilio.com/2010-04-01/Accounts/{cfg['TWILIO_ACCOUNT_SID']}/Messages.json"
         link = f"{cfg['PUBLIC_BASE_URL']}/admin/anomalies/{anomaly['id']}"
-        payload = parse.urlencode({"From": cfg["TWILIO_FROM"], "To": destination, "Body": f"⚠ BoxTwin #{anomaly['id']}: {anomaly['message']}\nResponda '1 {anomaly['id']}' para ciência, '2 {anomaly['id']}' para atendimento ou '3 {anomaly['id']}' para resolver.\n{link}", "StatusCallback": f"{cfg['PUBLIC_BASE_URL']}/api/webhooks/twilio/status"}).encode()
+        message_data = {
+            "From": cfg["TWILIO_FROM"],
+            "To": destination,
+            "StatusCallback": f"{cfg['PUBLIC_BASE_URL']}/api/webhooks/twilio/status",
+        }
+        content_sid = cfg.get("TWILIO_CONTENT_SID", "").strip()
+        if content_sid:
+            # O template Quick Reply usa {{1}} para o ID e {{2}} para a mensagem.
+            # Os botões devem devolver ack_ID, in_progress_ID e resolved_ID.
+            message_data.update({
+                "ContentSid": content_sid,
+                "ContentVariables": json.dumps({
+                    "1": str(anomaly["id"]),
+                    "2": str(anomaly["message"]),
+                }, ensure_ascii=False),
+            })
+        else:
+            # Compatibilidade com ambientes que ainda não configuraram o template.
+            message_data["Body"] = (
+                f"⚠ BoxTwin #{anomaly['id']}: {anomaly['message']}\n"
+                f"Responda '1 {anomaly['id']}' para ciência, '2 {anomaly['id']}' para atendimento "
+                f"ou '3 {anomaly['id']}' para resolver.\n{link}"
+            )
+        payload = parse.urlencode(message_data).encode()
         req = request.Request(endpoint, data=payload, headers={"Content-Type": "application/x-www-form-urlencoded"})
         token = __import__("base64").b64encode(f"{cfg['TWILIO_ACCOUNT_SID']}:{cfg['TWILIO_AUTH_TOKEN']}".encode()).decode()
         req.add_header("Authorization", f"Basic {token}")

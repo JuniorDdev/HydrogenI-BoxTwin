@@ -3,6 +3,7 @@ import time
 import base64
 import hashlib
 import hmac
+import re
 from datetime import datetime, timezone
 from functools import wraps
 from io import BytesIO
@@ -354,7 +355,7 @@ def valid_edge_token():
 @bp.post("/api/webhooks/twilio/status")
 def twilio_status():
     if not valid_twilio_signature():
-        return "Invalid signature", 403
+        return "Assinatura inválida.", 403
     sid, status = request.form.get("MessageSid", ""), request.form.get("MessageStatus", "")
     runtime().database.update_delivery_status(sid, status, request.form.get("ErrorMessage", ""))
     return "", 204
@@ -363,16 +364,47 @@ def twilio_status():
 @bp.post("/api/webhooks/twilio/incoming")
 def twilio_incoming():
     if not valid_twilio_signature():
+<<<<<<< HEAD
         return "Invalid signature", 403
+    # Quick Reply envia o ID oculto em ButtonPayload. Mantemos Body como
+    # fallback para SMS, mensagens digitadas e templates sem payload.
+    incoming = (
+        request.form.get("ButtonPayload", "").strip()
+        or request.form.get("ButtonText", "").strip()
+        or request.form.get("Body", "").strip()
+    )
+    action = None
+    anomaly_id = None
+    button_match = re.fullmatch(r"(ack|in_progress|resolved)_(\d+)", incoming, re.IGNORECASE)
+    if button_match:
+        action = {
+            "ack": "acknowledged",
+            "in_progress": "in_progress",
+            "resolved": "resolved",
+        }[button_match.group(1).lower()]
+        anomaly_id = int(button_match.group(2))
+    else:
+        command_match = re.fullmatch(r"([123])\s+(\d+)", incoming)
+        if command_match:
+            action = {"1": "acknowledged", "2": "in_progress", "3": "resolved"}[command_match.group(1)]
+            anomaly_id = int(command_match.group(2))
+
+    if not action or anomaly_id is None:
+=======
+        return "Assinatura inválida.", 403
+    # Status internos ficam em inglês no banco (compatibilidade com o resto do sistema); a mensagem
+    # de confirmação enviada por WhatsApp/SMS precisa aparecer sempre em português para o operador.
+    status_labels_pt = {"acknowledged": "ciente", "in_progress": "em atendimento", "resolved": "tratado"}
     parts = request.form.get("Body", "").strip().split()
     action = {"1": "acknowledged", "2": "in_progress", "3": "resolved"}.get(parts[0] if parts else "")
     if not action or len(parts) < 2 or not parts[1].isdigit():
+>>>>>>> origin/main
         reply = "Formato inválido. Responda 1 ID para ciência, 2 ID para atendimento ou 3 ID para resolver."
     else:
-        anomaly_id = int(parts[1])
         sender = request.form.get("From", "Responsável via Twilio")
         found = runtime().database.update_anomaly_status(anomaly_id, action, "Atualização recebida pelo WhatsApp/SMS.", sender)
-        reply = f"BoxTwin #{anomaly_id} atualizado para {action}." if found else "Anomalia não encontrada."
+        status_pt = status_labels_pt.get(action, action)
+        reply = f"BoxTwin #{anomaly_id} atualizado para {status_pt}." if found else "Anomalia não encontrada."
     escaped = reply.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     return f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>{escaped}</Message></Response>', 200, {"Content-Type": "application/xml"}
 
