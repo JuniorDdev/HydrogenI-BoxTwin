@@ -416,7 +416,7 @@ def twilio_incoming():
     }
     action, anomaly_id = parse_twilio_action(request.form)
     if not action or anomaly_id is None:
-        reply = "Não consegui identificar a tratativa. Responda 1 para atendido, 2 para em atendimento ou 3 para resolvido."
+        reply = 'Não consegui identificar a tratativa. Responda 1 para "ciente", 2 para "em atendimento" ou 3 para "resolvido".'
     else:
         detail = runtime().database.anomaly_detail(anomaly_id)
         if not detail:
