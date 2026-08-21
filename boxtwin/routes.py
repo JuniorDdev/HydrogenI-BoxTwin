@@ -364,14 +364,15 @@ def twilio_status():
 @bp.post("/api/webhooks/twilio/incoming")
 def twilio_incoming():
     if not valid_twilio_signature():
-<<<<<<< HEAD
-        return "Invalid signature", 403
+        return "Assinatura inválida.", 403
     # Quick Reply envia o ID oculto em ButtonPayload. Mantemos Body como
     # fallback para SMS, mensagens digitadas e templates sem payload.
+    # Status internos ficam em inglês no banco; a confirmação ao operador fica em português.
+    status_labels_pt = {"acknowledged": "ciente", "in_progress": "em atendimento", "resolved": "tratado"}
     incoming = (
         request.form.get("ButtonPayload", "").strip()
-        or request.form.get("ButtonText", "").strip()
         or request.form.get("Body", "").strip()
+        or request.form.get("ButtonText", "").strip()
     )
     action = None
     anomaly_id = None
@@ -390,15 +391,6 @@ def twilio_incoming():
             anomaly_id = int(command_match.group(2))
 
     if not action or anomaly_id is None:
-=======
-        return "Assinatura inválida.", 403
-    # Status internos ficam em inglês no banco (compatibilidade com o resto do sistema); a mensagem
-    # de confirmação enviada por WhatsApp/SMS precisa aparecer sempre em português para o operador.
-    status_labels_pt = {"acknowledged": "ciente", "in_progress": "em atendimento", "resolved": "tratado"}
-    parts = request.form.get("Body", "").strip().split()
-    action = {"1": "acknowledged", "2": "in_progress", "3": "resolved"}.get(parts[0] if parts else "")
-    if not action or len(parts) < 2 or not parts[1].isdigit():
->>>>>>> origin/main
         reply = "Formato inválido. Responda 1 ID para ciência, 2 ID para atendimento ou 3 ID para resolver."
     else:
         sender = request.form.get("From", "Responsável via Twilio")
