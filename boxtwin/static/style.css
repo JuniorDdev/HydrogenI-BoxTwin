@@ -158,3 +158,36 @@ body.landing-page{background:#101314;color:#f4f8fb}
 .landing-page .problem-section,.landing-page .landing-footer{border-color:#2b383f}
 .landing-page .capability-grid .capability-feature{background:radial-gradient(circle at 80% 0,#1769ff33,transparent 38%),linear-gradient(145deg,#061426,#0b2d4a)}
 @media(max-width:760px){.landing-page .landing-menu{background:#151c22;border-color:#243946}}
+
+/* Aplicativo companion: Raspberry/local + Railway */
+.mobile-page{min-height:100vh;background:radial-gradient(circle at 84% 0,#18d4ff24,transparent 27%),linear-gradient(180deg,#101314,#061426 48%,#101314);color:#f4f8fb}
+.mobile-shell{width:min(760px,calc(100% - 28px));margin:0 auto;padding:22px 0 40px}
+.mobile-hero{display:grid;grid-template-columns:86px 1fr;gap:18px;align-items:center;margin-bottom:16px;padding:20px;border:1px solid #243946;border-radius:24px;background:radial-gradient(circle at 100% 0,#1769ff3d,transparent 35%),#151c22;box-shadow:0 28px 70px #00000045}
+.mobile-logo{width:86px;height:86px;border:1px solid #18d4ff55;border-radius:18px;object-fit:cover;box-shadow:0 0 28px #1769ff55}
+.mobile-hero h1,.mobile-card h2{margin:6px 0;color:#fff}
+.mobile-hero p{margin:0;color:#b7c8d5;line-height:1.55}
+.mobile-card{margin-top:14px;padding:18px;border:1px solid #243946;border-radius:20px;background:#151c22;box-shadow:0 18px 44px #00000030}
+.mobile-card-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.mobile-status{display:inline-flex;padding:8px 11px;border-radius:999px;font-size:11px;font-weight:900}
+.mobile-status.online{color:#92f5d4;background:#123f3c;border:1px solid #1fd19b55}
+.mobile-status.offline{color:#ffd7dd;background:#3b1721;border:1px solid #ef5b6755}
+.mobile-card label{display:grid;gap:7px;margin-top:10px;color:#b7c8d5;font-size:12px;font-weight:800}
+.mobile-card input{width:100%;padding:13px;border:1px solid #31566f;border-radius:12px;background:#101820;color:#e8f5ff;font:inherit}
+.mobile-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.mobile-actions button{margin:0}
+.mobile-endpoint,.mobile-hint{display:block;margin-top:12px;color:#8da5ba;line-height:1.45}
+.mobile-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.mobile-metrics article{padding:15px;border:1px solid #243946;border-radius:18px;background:#151c22}
+.mobile-metrics small{display:block;color:#8da5ba;font-weight:800}
+.mobile-metrics strong{font-size:28px;color:#fff}
+.mobile-metrics span{color:#18d4ff}
+.mobile-reading{display:grid;gap:8px;color:#b7c8d5}
+.mobile-reading-row,.mobile-list-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #243946;border-radius:14px;background:#101820}
+.mobile-reading-row span,.mobile-list-item small{color:#8da5ba}
+.mobile-ok{color:#92f5d4}
+.mobile-danger,.mobile-error{color:#ffd7dd}
+.mobile-list{display:grid;gap:8px}
+.mobile-list-item{align-items:flex-start;flex-direction:column}
+.mobile-list-item b{color:#fff}
+@media(max-width:560px){.mobile-hero{grid-template-columns:1fr}.mobile-actions,.mobile-metrics{grid-template-columns:1fr 1fr}.mobile-card-heading{align-items:flex-start;flex-direction:column}.mobile-logo{width:112px;height:112px}.mobile-reading-row{align-items:flex-start;flex-direction:column}}
+@media(max-width:380px){.mobile-metrics{grid-template-columns:1fr}}

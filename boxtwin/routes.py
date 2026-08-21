@@ -16,6 +16,28 @@ from .reports import build_operational_report, build_operational_workbook
 bp = Blueprint("main", __name__)
 
 
+PUBLIC_CORS_PATHS = (
+    "/api/health",
+    "/api/readings",
+    "/api/readings/latest",
+    "/api/readings/history",
+    "/api/alerts/active",
+    "/api/calibration",
+    "/api/demo/",
+)
+
+
+@bp.after_app_request
+def add_public_api_cors_headers(response):
+    if not current_app.config.get("APP_CORS_ENABLED", True):
+        return response
+    if request.path.startswith(PUBLIC_CORS_PATHS):
+        response.headers.setdefault("Access-Control-Allow-Origin", "*")
+        response.headers.setdefault("Access-Control-Allow-Headers", "Content-Type, Authorization, X-BoxTwin-Token")
+        response.headers.setdefault("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    return response
+
+
 def runtime():
     return current_app.extensions["boxtwin_runtime"]
 
@@ -44,6 +66,14 @@ def landing():
 @bp.get("/simulador")
 def simulator():
     return render_template("simulator.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
+
+
+@bp.route("/app", methods=["GET", "OPTIONS"])
+@bp.route("/mobile", methods=["GET", "OPTIONS"])
+def mobile_app():
+    if request.method == "OPTIONS":
+        return "", 204
+    return render_template("mobile.html")
 
 
 @bp.route("/login", methods=["GET", "POST"])

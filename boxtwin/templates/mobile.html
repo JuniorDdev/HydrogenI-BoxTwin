@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#061426">
+  <title>HydrogenI App | BoxTwin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="mobile-page">
+  <main class="mobile-shell">
+    <header class="mobile-hero">
+      <img class="mobile-logo" src="{{ url_for('static', filename='img/hydrogeni-lab-logo.png') }}" alt="HydrogenI">
+      <div>
+        <span class="eyebrow">APLICATIVO OPERACIONAL</span>
+        <h1>HydrogenI BoxTwin</h1>
+        <p>Conecte no Raspberry local ou no Railway para acompanhar medições, alertas e saúde do BoxNode.</p>
+      </div>
+    </header>
+
+    <section class="mobile-card">
+      <div class="mobile-card-heading">
+        <div>
+          <span class="eyebrow">CONEXÃO</span>
+          <h2>Fonte de dados</h2>
+        </div>
+        <span id="mobileStatus" class="mobile-status offline">Offline</span>
+      </div>
+
+      <label>Raspberry/local
+        <input id="localBaseUrl" placeholder="http://boxtwin.local:5000">
+      </label>
+      <label>Railway/nuvem
+        <input id="cloudBaseUrl" placeholder="https://hydrogeni-boxtwin-production.up.railway.app">
+      </label>
+
+      <div class="mobile-actions">
+        <button id="useLocal" class="primary" type="button">Usar Raspberry</button>
+        <button id="useCloud" class="secondary" type="button">Usar Railway</button>
+      </div>
+      <small id="activeEndpoint" class="mobile-endpoint">Nenhuma fonte selecionada.</small>
+    </section>
+
+    <section class="mobile-metrics">
+      <article><small>Ocupação</small><strong id="mCapacity">--</strong><span>%</span></article>
+      <article><small>Volume</small><strong id="mVolume">--</strong><span>m³</span></article>
+      <article><small>Confiança</small><strong id="mConfidence">--</strong><span>%</span></article>
+      <article><small>Zonas</small><strong id="mZones">--</strong><span>/64</span></article>
+    </section>
+
+    <section class="mobile-card">
+      <div class="mobile-card-heading">
+        <div>
+          <span class="eyebrow">LEITURA</span>
+          <h2>Última medição</h2>
+        </div>
+        <button id="refreshMobile" class="secondary compact" type="button">Atualizar</button>
+      </div>
+      <div id="mobileReading" class="mobile-reading">Aguardando conexão.</div>
+      <div class="mobile-actions">
+        <button id="captureMobile" class="primary" type="button">Capturar no Raspberry</button>
+        <button id="calibrateMobile" class="secondary" type="button">Calibrar vazio</button>
+      </div>
+      <small class="mobile-hint">Captura e calibração funcionam quando a fonte selecionada for o Raspberry/local.</small>
+    </section>
+
+    <section class="mobile-card">
+      <div class="mobile-card-heading">
+        <div>
+          <span class="eyebrow">ALERTAS</span>
+          <h2>Tratativas ativas</h2>
+        </div>
+      </div>
+      <div id="mobileAlerts" class="mobile-list">Sem alertas carregados.</div>
+    </section>
+
+    <section class="mobile-card">
+      <div class="mobile-card-heading">
+        <div>
+          <span class="eyebrow">HISTÓRICO</span>
+          <h2>Últimas medições</h2>
+        </div>
+      </div>
+      <div id="mobileHistory" class="mobile-list">Sem histórico carregado.</div>
+    </section>
+  </main>
+  <script src="{{ url_for('static', filename='mobile.js') }}"></script>
+</body>
+</html>
