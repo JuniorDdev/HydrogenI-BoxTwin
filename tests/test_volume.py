@@ -8,9 +8,9 @@ def grid(value):
 
 
 def test_half_full_box_volume():
-    service = VolumeService(length_m=0.60, width_m=0.40, height_m=0.50)
-    result = service.calculate(grid(500), grid(250))
-    assert result["volume_m3"] == pytest.approx(0.06)
+    service = VolumeService(length_m=0.40, width_m=0.40, height_m=0.40)
+    result = service.calculate(grid(400), grid(200))
+    assert result["volume_m3"] == pytest.approx(0.032)
     assert result["capacity_percent"] == pytest.approx(50.0)
     assert result["confidence_percent"] == 100.0
 
@@ -21,6 +21,6 @@ def test_capacity_alert():
 
 
 def test_invalid_grid_shape():
-    service = VolumeService(length_m=0.60, width_m=0.40, height_m=0.50)
+    service = VolumeService(length_m=0.40, width_m=0.40, height_m=0.40)
     with pytest.raises(ValueError):
         service.calculate([[500]], [[250]])

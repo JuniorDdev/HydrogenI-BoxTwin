@@ -7,6 +7,23 @@ histórico operacional e gera alertas com tratativa rastreável.
 O projeto funciona hoje em modo simulado e está preparado para operar no Raspberry Pi como nó local,
 armazenar leituras durante quedas de internet e sincronizá-las com a aplicação hospedada no Railway.
 
+## Protótipo físico recomendado
+
+Para a bancada do MVP com sensor ToF 8×8, a configuração recomendada é:
+
+```text
+Área interna: 40 cm × 40 cm
+Altura interna útil: 40 cm
+Capacidade geométrica: 64 litros
+Altura máxima de material nos testes: 30 cm
+Capacidade operacional de teste: 48 litros
+Sensor centralizado, apontado para baixo, a 70–80 cm do fundo interno
+```
+
+Essa dimensão melhora a resolução por zona do sensor: cada célula da matriz 8×8 representa
+aproximadamente 5 cm × 5 cm da superfície. As instruções de corte e montagem estão em
+[PROTOTIPO_MDF.md](PROTOTIPO_MDF.md).
+
 ## Fluxo da solução
 
 ```text
@@ -90,6 +107,9 @@ Variáveis essenciais no Railway:
 APP_HOST=0.0.0.0
 APP_DEBUG=false
 SENSOR_MODE=mock
+BOX_LENGTH_M=0.40
+BOX_WIDTH_M=0.40
+BOX_HEIGHT_M=0.40
 DATABASE_PATH=data/boxtwin.db
 CALIBRATION_PATH=data/calibration.json
 SECRET_KEY=gere-uma-chave-longa-e-aleatoria

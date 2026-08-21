@@ -66,10 +66,10 @@ APP_DEBUG=false
 
 SENSOR_MODE=mock
 BOX_NODE_ID=BOX-RASP-01
-BOX_NAME=Box HydrogenI local
-BOX_LENGTH_M=0.60
+BOX_NAME=BoxTwin 3D - prototipo MDF 40x40
+BOX_LENGTH_M=0.40
 BOX_WIDTH_M=0.40
-BOX_HEIGHT_M=0.50
+BOX_HEIGHT_M=0.40
 SAMPLE_INTERVAL_SECONDS=5
 CAPACITY_ALERT_PERCENT=85
 MIN_CONFIDENCE_PERCENT=70
@@ -121,6 +121,10 @@ Raspberry.
 O e-mail fica desativado no Raspberry para evitar alertas duplicados. O Railway envia as notificações
 após receber as leituras sincronizadas. O RAG local funciona com `GROQ_ENABLED=false`, inclusive
 offline.
+
+Para o protótipo de bancada recomendado, use área interna de 40 cm × 40 cm e altura útil de 40 cm.
+Isso representa 0,064 m³, ou 64 litros de capacidade geométrica. Para preservar distância segura até
+o sensor, limite os testes práticos a 30 cm de material, equivalentes a 48 litros.
 
 ## 5. Testar manualmente
 
