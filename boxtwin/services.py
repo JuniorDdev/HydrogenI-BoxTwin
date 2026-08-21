@@ -167,7 +167,30 @@ class NotificationService:
             raise RuntimeError("Configuração Twilio incompleta.")
         endpoint = f"https://api.twilio.com/2010-04-01/Accounts/{cfg['TWILIO_ACCOUNT_SID']}/Messages.json"
         link = f"{cfg['PUBLIC_BASE_URL']}/admin/anomalies/{anomaly['id']}"
-        payload = parse.urlencode({"From": cfg["TWILIO_FROM"], "To": destination, "Body": f"⚠ BoxTwin #{anomaly['id']}: {anomaly['message']}\nResponda '1 {anomaly['id']}' para ciência, '2 {anomaly['id']}' para atendimento ou '3 {anomaly['id']}' para resolver.\n{link}", "StatusCallback": f"{cfg['PUBLIC_BASE_URL']}/api/webhooks/twilio/status"}).encode()
+        message_data = {
+            "From": cfg["TWILIO_FROM"],
+            "To": destination,
+            "StatusCallback": f"{cfg['PUBLIC_BASE_URL']}/api/webhooks/twilio/status",
+        }
+        content_sid = cfg.get("TWILIO_CONTENT_SID", "").strip()
+        if content_sid:
+            # O template Quick Reply usa {{1}} para o ID e {{2}} para a mensagem.
+            # Os botões devem devolver ack_ID, in_progress_ID e resolved_ID.
+            message_data.update({
+                "ContentSid": content_sid,
+                "ContentVariables": json.dumps({
+                    "1": str(anomaly["id"]),
+                    "2": str(anomaly["message"]),
+                }, ensure_ascii=False),
+            })
+        else:
+            # Compatibilidade com ambientes que ainda não configuraram o template.
+            message_data["Body"] = (
+                f"⚠ BoxTwin #{anomaly['id']}: {anomaly['message']}\n"
+                f"Responda '1 {anomaly['id']}' para ciência, '2 {anomaly['id']}' para atendimento "
+                f"ou '3 {anomaly['id']}' para resolver.\n{link}"
+            )
+        payload = parse.urlencode(message_data).encode()
         req = request.Request(endpoint, data=payload, headers={"Content-Type": "application/x-www-form-urlencoded"})
         token = __import__("base64").b64encode(f"{cfg['TWILIO_ACCOUNT_SID']}:{cfg['TWILIO_AUTH_TOKEN']}".encode()).decode()
         req.add_header("Authorization", f"Basic {token}")

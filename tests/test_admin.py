@@ -91,6 +91,14 @@ def test_recipient_rule_detail_and_twilio_reply(tmp_path):
     detail = client.get(f"/api/admin/anomalies/{anomaly_id}").get_json()
     assert detail["anomaly"]["status"] == "in_progress"
 
+    button_reply = client.post(
+        "/api/webhooks/twilio/incoming",
+        data={"ButtonPayload": f"resolved_{anomaly_id}", "ButtonText": "Resolvido", "From": "whatsapp:+5598999999999"},
+    )
+    assert button_reply.status_code == 200
+    detail = client.get(f"/api/admin/anomalies/{anomaly_id}").get_json()
+    assert detail["anomaly"]["status"] == "resolved"
+
 
 def test_admin_sync_status(tmp_path):
     client = make_client(tmp_path)

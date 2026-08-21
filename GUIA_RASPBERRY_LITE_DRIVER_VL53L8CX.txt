@@ -1,0 +1,423 @@
+GUIA DE INICIALIZAÇÃO
+RASPBERRY PI OS LITE 64-BIT + HYDROGENI + VL53L8CX
+Versão: 20/08/2026
+
+======================================================================
+1. OBJETIVO
+======================================================================
+
+Preparar o Raspberry Pi OS Lite para:
+
+- administração por SSH;
+- conexão automática às redes conhecidas;
+- comunicação I2C com o sensor;
+- instalação do HydrogenI BoxTwin;
+- preparação do driver Linux do VL53L8CX;
+- futura entrega de uma matriz 8x8 em milímetros ao BoxTwin.
+
+IMPORTANTE:
+
+O código atual ainda não contém o driver físico final. O arquivo
+boxtwin/sensors/vl53l8cx.py é um adaptador reservado e interrompe a
+inicialização se SENSOR_MODE=vl53l8cx for usado antes da implementação.
+
+Até concluir driver, ligação, leitura e calibração, mantenha:
+
+SENSOR_MODE=mock
+
+======================================================================
+2. ATUALIZAÇÃO DO RASPBERRY PI OS LITE
+======================================================================
+
+Execute um comando por vez:
+
+sudo apt update
+sudo apt full-upgrade -y
+sudo apt install -y git python3 python3-venv python3-pip i2c-tools build-essential cmake pkg-config network-manager
+
+Defina o hostname:
+
+sudo raspi-config nonint do_hostname boxtwin
+
+Habilite I2C:
+
+sudo raspi-config nonint do_i2c 0
+
+Confirme:
+
+hostname
+nmcli --version
+nmcli device status
+
+Reinicie:
+
+sudo reboot
+
+Depois de aproximadamente um minuto, reconecte:
+
+ssh SEU_USUARIO@boxtwin.local
+
+======================================================================
+3. CONFIGURAR O WI-FI DE CASA
+======================================================================
+
+No Raspberry Pi OS Bookworm ou mais recente, use NetworkManager. Não edite
+wpa_supplicant.conf como procedimento principal.
+
+Execute:
+
+sudo nmtui
+
+No menu:
+
+1. Selecione Edit a connection.
+2. Selecione Add.
+3. Escolha Wi-Fi.
+4. Profile name: wifi-casa
+5. SSID: nome exato da rede de casa.
+6. Security: WPA & WPA2 Personal.
+7. Informe a senha.
+8. Marque Automatically connect.
+9. Confirme em OK.
+10. Volte e escolha Quit.
+
+Confirme que o perfil foi salvo:
+
+nmcli connection show
+
+Confirme a reconexão automática:
+
+nmcli -f connection.id,connection.autoconnect connection show wifi-casa
+
+Não ative wifi-casa no trabalho se a rede de casa não estiver disponível.
+
+======================================================================
+4. VERIFICAR O I2C SEM O SENSOR
+======================================================================
+
+Execute:
+
+ls -l /dev/i2c-*
+lsmod | grep i2c
+
+O barramento principal normalmente aparece como:
+
+/dev/i2c-1
+
+Se não aparecer:
+
+sudo raspi-config
+
+Entre em:
+
+Interface Options -> I2C -> Enable
+
+Depois reinicie:
+
+sudo reboot
+
+======================================================================
+5. NÃO CONECTE O SENSOR ANTES DE IDENTIFICAR A PLACA
+======================================================================
+
+Antes da ligação, registre:
+
+- fabricante da placa;
+- modelo completo;
+- foto da frente e do verso;
+- tensão aceita em VIN/VCC;
+- presença de regulador e conversor de nível lógico;
+- nomes dos pinos;
+- barramento pretendido: I2C ou SPI.
+
+Possibilidades comuns:
+
+- módulo VL53L8CX integrado em uma placa própria;
+- placa SATEL-VL53L8/SATEL-VL53L8CX da ST;
+- breakout de fabricante terceirizado;
+- sensor conectado a microcontrolador intermediário.
+
+Essas placas podem exigir ligações diferentes. Não aplique 5 V diretamente
+em uma placa que aceite somente 1,8 V ou 3,3 V.
+
+======================================================================
+6. REFERÊNCIA DOS PINOS I2C DO RASPBERRY
+======================================================================
+
+No conector de 40 pinos do Raspberry Pi:
+
+- pino físico 1: 3,3 V;
+- pino físico 3: GPIO2 / SDA1;
+- pino físico 5: GPIO3 / SCL1;
+- pino físico 6: GND.
+
+Esses são os pinos do Raspberry, não uma autorização para conectá-los
+diretamente a qualquer versão da placa VL53L8CX.
+
+A alimentação e os sinais adicionais da placa podem incluir:
+
+- VIN/VCC;
+- GND;
+- SDA;
+- SCL;
+- LPn ou LPN;
+- PWREN;
+- INT/GPIO1;
+- SPI_I2C_n;
+- NCS, MOSI e MISO.
+
+Use o diagrama específico da placa antes de energizar.
+
+======================================================================
+7. PRIMEIRO TESTE DE DETECÇÃO, APÓS A LIGAÇÃO VALIDADA
+======================================================================
+
+Com o Raspberry desligado, faça a ligação validada da placa. Depois ligue o
+Raspberry e execute:
+
+sudo i2cdetect -y 1
+
+O VL53L8CX utiliza endereço I2C de 8 bits 0x52 na documentação da ST. Em
+ferramentas Linux que exibem endereço de 7 bits, ele normalmente aparece
+como 0x29.
+
+Se nenhum dispositivo aparecer:
+
+1. desligue o Raspberry;
+2. confira alimentação e GND;
+3. confira SDA e SCL;
+4. confira LPn/PWREN e seleção I2C/SPI da placa;
+5. confirme se a placa possui pull-ups e conversão de nível;
+6. não troque fios com o Raspberry energizado.
+
+Verifique mensagens do kernel:
+
+dmesg | grep -i i2c
+
+======================================================================
+8. DRIVER RECOMENDADO PARA A PLACA OFICIAL DA ST
+======================================================================
+
+A ST fornece o pacote STSW-IMG042, um driver Linux baseado no Ultra Lite
+Driver (ULD) do VL53L8CX. A ST informa que ele pode operar em user space ou
+kernel space e que foi validado em Raspberry Pi 3.
+
+Página oficial:
+
+https://www.st.com/en/embedded-software/stsw-img042.html
+
+Documentação do sensor:
+
+https://www.st.com/en/imaging-and-photonics-solutions/vl53l8cx.html
+
+Manual oficial:
+
+https://www.st.com/resource/en/user_manual/um3109-a-guide-for-using-the-vl53l8cx-lowpower-highperformance-timeofflight-multizone-ranging-sensor-stmicroelectronics.pdf
+
+ATENÇÃO:
+
+- o download da ST pode exigir conta e aceite de licença;
+- não instale a biblioteca Arduino stm32duino como driver Python do
+  Raspberry; ela serve como referência para Arduino/STM32;
+- se a placa for de outro fabricante, use primeiro a biblioteca indicada
+  por esse fabricante;
+- não copie comandos de instalação de outro breakout sem confirmar o
+  modelo.
+
+======================================================================
+9. PREPARAÇÃO DO DIRETÓRIO DO DRIVER
+======================================================================
+
+Esta etapa pode ser feita agora, sem o sensor:
+
+sudo mkdir -p /opt/vl53l8cx-driver
+sudo chown -R "$USER":"$USER" /opt/vl53l8cx-driver
+
+Quando o pacote oficial ou a biblioteca correta for obtida, coloque os
+fontes nesse diretório e leia primeiro:
+
+- README;
+- LICENSE;
+- instruções de build;
+- configuração da plataforma I2C;
+- exemplo de leitura 8x8.
+
+Não execute um comando de compilação genérico antes de conferir a estrutura
+real do pacote baixado.
+
+======================================================================
+10. CONTRATO ENTRE O DRIVER E O BOXTWIN
+======================================================================
+
+O BoxTwin espera que este método seja implementado:
+
+boxtwin/sensors/vl53l8cx.py
+
+Método:
+
+read_distance_grid_mm()
+
+Formato obrigatório:
+
+- lista com 8 linhas;
+- cada linha com 8 valores;
+- distância em milímetros;
+- valor numérico para zona válida;
+- None para zona inválida;
+- mesma orientação física em todas as leituras.
+
+Exemplo simplificado:
+
+[
+  [500, 501, 499, 502, 500, 498, 501, 500],
+  [501, 500, 500, 499, 502, 501, 500, 498],
+  ... total de 8 linhas ...
+]
+
+O adaptador deverá:
+
+1. inicializar o barramento e o sensor uma vez;
+2. configurar resolução 8x8;
+3. configurar frequência adequada;
+4. iniciar ranging;
+5. aguardar dados prontos sem travar indefinidamente;
+6. extrair as 64 distâncias;
+7. avaliar o status de cada zona;
+8. converter zonas inválidas para None;
+9. retornar a matriz em milímetros;
+10. tratar timeout e desconexão com erro claro.
+
+======================================================================
+11. TESTE ISOLADO ANTES DE ALTERAR O BOXTWIN
+======================================================================
+
+Antes de editar SENSOR_MODE, crie ou use o exemplo fornecido pelo driver e
+confirme:
+
+- identificação do sensor;
+- inicialização sem erro;
+- resolução 8x8;
+- 64 valores por quadro;
+- atualização contínua;
+- estabilidade durante pelo menos 30 minutos;
+- recuperação após reinicialização do Raspberry;
+- tratamento quando o sensor é desconectado.
+
+Salve uma saída de teste em arquivo:
+
+python EXEMPLO_DO_DRIVER.py | tee leitura_vl53l8cx.txt
+
+O nome do exemplo dependerá do pacote escolhido.
+
+======================================================================
+12. INTEGRAÇÃO NO CÓDIGO
+======================================================================
+
+Somente após o teste isolado funcionar:
+
+1. abra o adaptador:
+
+nano /opt/boxtwin/boxtwin/sensors/vl53l8cx.py
+
+2. substitua o RuntimeError temporário pela inicialização do driver;
+3. implemente read_distance_grid_mm();
+4. adicione a dependência correta ao requirements.txt somente se ela for
+   uma biblioteca Python instalável;
+5. crie testes que usem mock do driver, sem exigir hardware no CI;
+6. execute:
+
+cd /opt/boxtwin
+source .venv/bin/activate
+pytest -q
+
+7. teste a aplicação manualmente ainda em modo mock;
+8. faça backup do banco e da calibração;
+9. altere no .env.raspberry:
+
+SENSOR_MODE=vl53l8cx
+
+10. reinicie:
+
+sudo systemctl restart boxtwin
+journalctl -u boxtwin -f
+
+======================================================================
+13. CALIBRAÇÃO
+======================================================================
+
+Depois que o sensor real estiver estável:
+
+1. esvazie completamente o box;
+2. confirme que nenhuma pessoa ou objeto está no campo de visão;
+3. execute a calibração de box vazio pelo painel;
+4. verifique data/calibration.json;
+5. coloque volumes físicos conhecidos;
+6. compare volume real e volume calculado;
+7. registre erro absoluto e percentual;
+8. repita em diferentes geometrias de pilha;
+9. teste poeira, vibração e obstrução parcial de forma segura.
+
+Não declare margem de erro industrial antes dessa validação.
+
+======================================================================
+14. PERMISSÕES PARA O SERVIÇO
+======================================================================
+
+O usuário do serviço precisa acessar o I2C. Confira o usuário:
+
+grep '^User=' /etc/systemd/system/boxtwin.service
+
+Adicione esse usuário ao grupo i2c. Exemplo para usuário pi:
+
+sudo usermod -aG i2c pi
+
+Reinicie o Raspberry para aplicar o grupo:
+
+sudo reboot
+
+Depois confira:
+
+groups
+ls -l /dev/i2c-1
+
+======================================================================
+15. CHECKLIST ANTES DE USAR SENSOR_MODE=vl53l8cx
+======================================================================
+
+[ ] fabricante e modelo da placa confirmados
+[ ] tensão e pinagem confirmadas na documentação
+[ ] I2C habilitado
+[ ] /dev/i2c-1 disponível
+[ ] usuário do serviço no grupo i2c
+[ ] placa detectada no barramento
+[ ] driver correto para a placa instalado
+[ ] exemplo oficial executado
+[ ] matriz 8x8 confirmada
+[ ] unidades confirmadas em milímetros
+[ ] zonas inválidas tratadas
+[ ] timeout implementado
+[ ] testes do BoxTwin aprovados
+[ ] calibração do box vazio realizada
+[ ] comparação com volume conhecido realizada
+
+Somente depois marque:
+
+SENSOR_MODE=vl53l8cx
+
+======================================================================
+16. FONTES OFICIAIS
+======================================================================
+
+Raspberry Pi - configuração I2C:
+https://www.raspberrypi.com/documentation/configuration/computers/raspberry-pi.html
+
+ST - driver Linux STSW-IMG042:
+https://www.st.com/en/embedded-software/stsw-img042.html
+
+ST - página do VL53L8CX:
+https://www.st.com/en/imaging-and-photonics-solutions/vl53l8cx.html
+
+ST - manual UM3109:
+https://www.st.com/resource/en/user_manual/um3109-a-guide-for-using-the-vl53l8cx-lowpower-highperformance-timeofflight-multizone-ranging-sensor-stmicroelectronics.pdf
+
+FIM DO GUIA

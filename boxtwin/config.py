@@ -37,6 +37,7 @@ def load_config():
         "TWILIO_AUTH_TOKEN": os.getenv("TWILIO_AUTH_TOKEN", ""),
         "TWILIO_FROM": os.getenv("TWILIO_FROM", ""),
         "TWILIO_TO": os.getenv("TWILIO_TO", ""),
+        "TWILIO_CONTENT_SID": os.getenv("TWILIO_CONTENT_SID", ""),
         "PUBLIC_BASE_URL": os.getenv("PUBLIC_BASE_URL", "http://127.0.0.1:5000").rstrip("/"),
         "GROQ_ENABLED": _bool("GROQ_ENABLED"),
         "GROQ_API_KEY": os.getenv("GROQ_API_KEY", ""),
