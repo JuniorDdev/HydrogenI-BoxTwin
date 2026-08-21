@@ -409,6 +409,11 @@ def twilio_incoming():
         return "Assinatura inválida.", 403
     status_labels_pt = {"acknowledged": "ciente", "in_progress": "em atendimento", "resolved": "tratado"}
     next_step = {"open": "acknowledged", "acknowledged": "in_progress", "in_progress": "resolved"}
+    next_replies = {
+        "acknowledged": 'Próximo passo, responda "em atendimento" ou envie 2.',
+        "in_progress": 'Próximo passo, responda "resolvido" ou envie 3.',
+        "resolved": "Tratativa encerrada. O alerta foi movido para o relatório.",
+    }
     action, anomaly_id = parse_twilio_action(request.form)
     if not action or anomaly_id is None:
         reply = "Não consegui identificar a tratativa. Responda 1 para atendido, 2 para em atendimento ou 3 para resolvido."
@@ -425,7 +430,7 @@ def twilio_incoming():
             sender = request.form.get("From", "Responsável via Twilio")
             runtime().database.update_anomaly_status(anomaly_id, action, "Atualização recebida pelo WhatsApp/SMS.", sender)
             status_pt = status_labels_pt.get(action, action)
-            reply = f"BoxTwin #{anomaly_id} atualizado para {status_pt}. Próximo passo: {status_labels_pt.get(next_step.get(action), 'acompanhar no painel')}."
+            reply = f"BoxTwin #{anomaly_id} atualizado para {status_pt}. {next_replies[action]}"
     escaped = reply.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     return f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>{escaped}</Message></Response>', 200, {"Content-Type": "application/xml"}
 
