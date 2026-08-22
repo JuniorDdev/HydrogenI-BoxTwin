@@ -1,0 +1,1 @@
+C:\Users\junio\Desktop\PROJETOS PYHTON\HydrogenI - projeto\HydrogenY-BoxTwin\HydrogenI-BoxTwin\hydrogeni_pwa_apk\build\app\intermediates\cxx\RelWithDebInfo\5d2c3942\obj\arm64-v8a

@@ -38,3 +38,11 @@ Thumbs.db
 # Artefatos temporários gerados pelo Codex/apresentações
 .codex_tmp_*/
 *.inspect.ndjson
+
+# Gradle local cache
+**/.gradle/
+
+# Flutter/Gradle generated files
+**/build/
+**/.gradle/
+**/.dart_tool/
