@@ -38,3 +38,18 @@ Thumbs.db
 # Artefatos temporários gerados pelo Codex/apresentações
 .codex_tmp_*/
 *.inspect.ndjson
+
+# Flutter/Gradle generated files
+**/build/
+**/.gradle/
+**/.dart_tool/
+**/.cxx/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/local.properties
+**/GeneratedPluginRegistrant.java
+
+# Credenciais de assinatura Android
+**/key.properties
+**/*.jks
+**/*.keystore

@@ -14,6 +14,20 @@ def test_health(tmp_path):
     response = client.get("/api/health")
     assert response.status_code == 200
     assert response.get_json()["status"] == "online"
+    assert response.headers["Access-Control-Allow-Origin"] == "*"
+
+
+def test_mobile_app_route(tmp_path):
+    app = create_app({
+        "TESTING": True,
+        "DATABASE_PATH": str(tmp_path / "test.db"),
+        "CALIBRATION_PATH": str(tmp_path / "calibration.json"),
+        "SENSOR_MODE": "mock",
+    })
+    response = app.test_client().get("/app")
+    assert response.status_code == 200
+    assert b"APLICATIVO OPERACIONAL" in response.data
+    assert b"Raspberry/local" in response.data
 
 
 def test_demo_setup_and_scenario(tmp_path):

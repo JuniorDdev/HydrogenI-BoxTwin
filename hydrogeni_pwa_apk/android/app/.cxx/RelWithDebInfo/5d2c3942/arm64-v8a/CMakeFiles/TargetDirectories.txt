@@ -1,0 +1,2 @@
+C:/Users/junio/Desktop/PROJETOS PYHTON/HydrogenI - projeto/HydrogenY-BoxTwin/HydrogenI-BoxTwin/hydrogeni_pwa_apk/android/app/.cxx/RelWithDebInfo/5d2c3942/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/junio/Desktop/PROJETOS PYHTON/HydrogenI - projeto/HydrogenY-BoxTwin/HydrogenI-BoxTwin/hydrogeni_pwa_apk/android/app/.cxx/RelWithDebInfo/5d2c3942/arm64-v8a/CMakeFiles/rebuild_cache.dir
