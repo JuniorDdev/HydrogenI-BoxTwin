@@ -10,7 +10,7 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/"><div class="brand-mark">H</div><div><span>HYDROGENI · BOXNODE</span><h1>BoxTwin 3D</h1><p>{{ box_name }} · {{ node_id }}</p></div></a>
+    <a class="brand" href="/"><img class="brand-logo" src="{{ url_for('static', filename='img/hydrogeni-lab-logo.png') }}" alt="HydrogenI"><div><span>HYDROGENI · BOXNODE</span><h1>BoxTwin 3D</h1><p>{{ box_name }} · {{ node_id }}</p></div></a>
     <div class="status-group"><a href="/" class="badge">PROJETO</a><a href="/admin" class="badge">ÁREA ADMIN</a><b id="modeBadge" class="badge demo">MODO DEMONSTRAÇÃO</b><b id="connection" class="badge">Conectando…</b></div>
   </header>
   <main>

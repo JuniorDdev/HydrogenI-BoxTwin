@@ -40,8 +40,12 @@ def test_admin_login_and_rag(tmp_path):
 
 def test_public_landing_and_simulator_are_separate(tmp_path):
     client = make_client(tmp_path)
-    landing = client.get("/")
+    group_landing = client.get("/")
+    landing = client.get("/projeto")
     simulator = client.get("/simulador")
+    assert group_landing.status_code == 200
+    assert b"HydrogeNI" in group_landing.data
+    assert b"Domingos de J." in group_landing.data
     assert landing.status_code == 200
     assert b"Transforme uma pilha irregular" in landing.data
     assert simulator.status_code == 200

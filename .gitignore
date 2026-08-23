@@ -18,6 +18,13 @@ data/calibration.json
 __pycache__/
 *.pyc
 *.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
 
 # Logs
 *.log
@@ -26,10 +33,10 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Arquivos de configuração sensíveis (mas você pode querer versionar o .env.example)
+# Arquivos de configuração sensíveis
 .env
-.env.local
-.env.raspberry
+.env.*
+!.env.example
 
 # Arquivos do editor
 .vscode/
@@ -38,3 +45,25 @@ Thumbs.db
 # Artefatos temporários gerados pelo Codex/apresentações
 .codex_tmp_*/
 *.inspect.ndjson
+Mentoria_HydrogenI_*.pptx
+box_mdf_*.png
+
+# Saídas geradas pela aplicação
+output/
+
+# Flutter/Gradle generated files
+**/build/
+**/.gradle/
+**/.dart_tool/
+**/.cxx/
+**/.packages
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/local.properties
+**/GeneratedPluginRegistrant.java
+**/*.iml
+
+# Credenciais de assinatura Android
+**/key.properties
+**/*.jks
+**/*.keystore

@@ -147,6 +147,7 @@ Na rede interna, acesse:
 
 - `http://IP_DO_RASPBERRY:5000/`;
 - `http://IP_DO_RASPBERRY:5000/simulador`;
+- `http://IP_DO_RASPBERRY:5000/app`;
 - `http://IP_DO_RASPBERRY:5000/admin`.
 
 ## 6. Instalar como serviço

@@ -39,6 +39,7 @@ def load_config():
         "TWILIO_TO": os.getenv("TWILIO_TO", ""),
         "TWILIO_CONTENT_SID": os.getenv("TWILIO_CONTENT_SID", ""),
         "PUBLIC_BASE_URL": os.getenv("PUBLIC_BASE_URL", "http://127.0.0.1:5000").rstrip("/"),
+        "APP_CORS_ENABLED": _bool("APP_CORS_ENABLED", True),
         "GROQ_ENABLED": _bool("GROQ_ENABLED"),
         "GROQ_API_KEY": os.getenv("GROQ_API_KEY", ""),
         "GROQ_MODEL": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),

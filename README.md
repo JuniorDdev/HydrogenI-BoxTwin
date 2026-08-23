@@ -90,6 +90,7 @@ Acesse:
 
 - projeto: `http://127.0.0.1:5000/`;
 - simulador: `http://127.0.0.1:5000/simulador`;
+- aplicativo móvel/PWA: `http://127.0.0.1:5000/app`;
 - administração: `http://127.0.0.1:5000/admin`;
 - saúde da aplicação: `http://127.0.0.1:5000/api/health`.
 

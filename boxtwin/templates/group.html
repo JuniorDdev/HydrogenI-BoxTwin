@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#061426">
+  <meta name="description" content="HydrogeNI: grupo de inovação aplicada em IA, sensores e automação para operações portuárias.">
+  <title>HydrogeNI | Inovação portuária com IA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="group-page">
+  <nav class="group-nav" aria-label="Navegação HydrogeNI">
+    <a class="group-brand" href="/" aria-label="HydrogenI - início"><img class="brand-logo" src="{{ url_for('static', filename='img/hydrogeni-lab-logo.png') }}" alt="HydrogenI"><div><b>HydrogenI</b><small>H1 + IA</small></div></a>
+    <div class="group-menu">
+      <a href="#time">Time</a>
+      <a href="#projetos">Projetos</a>
+      <a href="#visao">Visão</a>
+      <a class="group-nav-ghost" href="/projeto">BoxTwin 3D</a>
+      <a class="group-nav-primary" href="/simulador">Abrir sistema</a>
+    </div>
+  </nav>
+
+  <main class="group-main">
+    <section class="group-hero">
+      <div class="energy-field" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="group-copy">
+        <img class="lab-mark" src="{{ url_for('static', filename='img/hydrogeni-lab-logo.png') }}" alt="HydrogeNI Lab">
+        <span class="group-kicker">Hackathon H.C.P.I. · ICT Guará</span>
+        <h1>HydrogeNI — H1 + IA para inovação portuária.</h1>
+        <p>Unimos sensores, software e inteligência artificial para transformar medições manuais em dados rastreáveis, úteis e demonstráveis. Nosso primeiro produto é o BoxTwin 3D.</p>
+        <div class="group-actions">
+          <a class="group-cta" href="/projeto">Conhecer o BoxTwin 3D <span>→</span></a>
+          <a class="group-cta secondary" href="/simulador">Ver sistema funcionando</a>
+        </div>
+      </div>
+      <aside class="group-card" aria-label="Resumo do projeto HydrogeNI">
+        <div class="group-card-top"><span>HYDROGENI LAB</span><b>H1 + IA</b></div>
+        <div class="group-orbit">
+          <i></i><i></i><i></i>
+          <strong>IA</strong>
+        </div>
+        <div class="group-stats">
+          <div><small>Foco</small><b>H.C.P.I.</b></div>
+          <div><small>MVP</small><b>BoxTwin</b></div>
+          <div><small>Stack</small><b>Sensor + IA</b></div>
+        </div>
+      </aside>
+    </section>
+
+    <section id="time" class="group-section group-split">
+      <div><span class="group-kicker">Quem somos</span><h2>Um time criando tecnologia aplicável, não só apresentação bonita.</h2></div>
+      <div>
+        <p>O HydrogeNI nasceu para experimentar rápido, validar com dados e construir soluções que possam sair da bancada para um piloto real. A ideia é unir software, hardware, IA e visão operacional.</p>
+        <div class="member-grid" aria-label="Integrantes do projeto">
+          <span>Domingos de J.</span>
+          <span>Fernando Harrison</span>
+          <span>Geovane Paixão</span>
+          <span>Luís Hyerro</span>
+          <span>Mateus Silva</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="projetos" class="group-section">
+      <div class="group-section-heading"><span class="group-kicker">Projeto em destaque</span><h2>BoxTwin 3D</h2></div>
+      <div class="group-project-grid">
+        <article><span>01</span><h3>Medição automática</h3><p>Transforma leitura de profundidade em volume, ocupação e mapa de superfície.</p></article>
+        <article><span>02</span><h3>Decisão assistida</h3><p>Gera alertas, histórico e tratativas para reduzir dependência de estimativa visual.</p></article>
+        <article><span>03</span><h3>Arquitetura evolutiva</h3><p>Começa com sensor ToF 8×8 e pode evoluir para LiDAR, câmera 3D ou múltiplos sensores.</p></article>
+      </div>
+    </section>
+
+    <section id="visao" class="group-section group-path">
+      <div><span class="group-kicker">Caminho da experiência</span><h2>Da identidade do grupo ao sistema operacional.</h2></div>
+      <div class="group-path-flow">
+        <a href="/">HydrogeNI</a><i>→</i><a href="/projeto">Landing do projeto</a><i>→</i><a href="/simulador">Sistema BoxTwin</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="group-footer">
+    <a class="group-brand" href="/"><img class="brand-logo" src="{{ url_for('static', filename='img/hydrogeni-lab-logo.png') }}" alt="HydrogenI"><div><b>HydrogenI</b><small>H1 + IA</small></div></a>
+    <p>Inovação aplicada para operação portuária, automação e inteligência operacional.</p>
+  </footer>
+</body>
+</html>

@@ -1,1 +1,1 @@
-{"name":"HydrogenI BoxTwin","short_name":"BoxTwin","start_url":"/simulador","display":"standalone","background_color":"#071526","theme_color":"#071526","description":"Monitoramento responsivo de volume, gêmeo digital e anomalias do BoxTwin."}
+{"name":"HydrogenI BoxTwin","short_name":"BoxTwin","start_url":"/app","display":"standalone","background_color":"#071526","theme_color":"#071526","description":"Aplicativo operacional para monitorar Raspberry, Railway, medições e anomalias do BoxTwin."}
