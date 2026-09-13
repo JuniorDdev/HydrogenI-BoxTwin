@@ -24,11 +24,13 @@ def main() -> None:
     for relative in relative_paths:
         source = source_root / relative
         destination = target_root / relative
-        if not source.is_file() or not destination.is_file():
-            raise SystemExit(f"Arquivo ausente: {source if not source.is_file() else destination}")
-        backup = destination.with_name(destination.name + ".bak-vl53l8cx-live")
-        if not backup.exists():
-            shutil.copy2(destination, backup)
+        if not source.is_file():
+            raise SystemExit(f"Arquivo de atualizacao ausente: {source}")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.is_file():
+            backup = destination.with_name(destination.name + ".bak-vl53l8cx-live")
+            if not backup.exists():
+                shutil.copy2(destination, backup)
         shutil.copy2(source, destination)
     print("Modo de leitura ao vivo instalado. Backups terminam com .bak-vl53l8cx-live.")
 
