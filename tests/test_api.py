@@ -123,3 +123,18 @@ def test_live_grid_is_ingested_and_exposed(tmp_path):
     assert stored.status_code == 200
     assert stored.get_json()["distance_grid_mm"] == payload["distance_grid_mm"]
     assert client.get("/gemeo-sensor").status_code == 200
+
+
+def test_local_raw_read_is_cached_for_the_live_twin(tmp_path):
+    app = create_app({
+        "TESTING": True,
+        "DATABASE_PATH": str(tmp_path / "test.db"),
+        "CALIBRATION_PATH": str(tmp_path / "calibration.json"),
+        "SENSOR_MODE": "mock",
+    })
+    client = app.test_client()
+    raw = client.get("/api/sensor/grid")
+    assert raw.status_code == 200
+    cached = client.get("/api/live-grid").get_json()
+    assert cached["valid_zones"] == 64
+    assert cached["distance_grid_mm"] == raw.get_json()["distance_grid_mm"]

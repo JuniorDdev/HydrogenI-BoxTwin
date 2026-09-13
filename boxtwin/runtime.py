@@ -38,6 +38,8 @@ class BoxTwinRuntime:
             "valid_zones": sum(value is not None for row in grid for value in row),
             "captured_at": datetime.now(timezone.utc).isoformat(),
         }
+        # O painel local consulta o banco, em vez de iniciar outra leitura física.
+        self.database.upsert_live_sensor_grid(payload)
         try:
             sync = self.edge_sync.push_live_grid(payload)
             payload["sync_status"] = sync.get("status", "sent")
