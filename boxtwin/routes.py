@@ -232,7 +232,10 @@ def calibrate():
 
 @bp.get("/api/sensor/grid")
 def sensor_grid():
-    return jsonify(runtime().read_raw_sensor_grid())
+    try:
+        return jsonify(runtime().read_raw_sensor_grid())
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc), "status": "sensor_unavailable"}), 503
 
 
 @bp.get("/api/live-grid")

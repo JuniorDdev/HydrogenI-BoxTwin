@@ -2,6 +2,7 @@
 
 import re
 import subprocess
+import threading
 from pathlib import Path
 
 from .base import DepthSensor
@@ -20,6 +21,9 @@ class VL53L8CXSensor(DepthSensor):
         self.menu_path = Path(menu_path).expanduser()
         self.timeout_seconds = float(timeout_seconds)
         self._runner = runner
+        # O executável ULD usa o mesmo barramento I²C; somente uma leitura pode
+        # acontecer por vez entre a sincronização automática e uma rota HTTP.
+        self._read_lock = threading.Lock()
         if not self.menu_path.is_file():
             raise RuntimeError(
                 "Executavel VL53L8CX nao encontrado em "
@@ -28,6 +32,10 @@ class VL53L8CXSensor(DepthSensor):
             )
 
     def read_distance_grid_mm(self):
+        with self._read_lock:
+            return self._read_distance_grid_mm()
+
+    def _read_distance_grid_mm(self):
         try:
             result = self._runner(
                 [str(self.menu_path)],
