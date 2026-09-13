@@ -270,8 +270,31 @@ class EdgeSyncService:
             **self.database.sync_status(),
         }
 
+    def push_live_grid(self, payload):
+        """Send a diagnostic frame straight to the cloud; it is not a calibrated reading."""
+        if not self.enabled():
+            return {"status": "disabled"}
+        endpoint = f"{self.config['EDGE_SYNC_TARGET_URL'].rstrip('/')}/api/edge/live-grid"
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        req = request.Request(
+            endpoint,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.config['EDGE_SYNC_TOKEN']}",
+                "User-Agent": "HydrogenI-BoxTwin-LiveGrid/1.0",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=self.config["EDGE_SYNC_TIMEOUT_SECONDS"]) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urlerror.HTTPError as exc:
+            detail = exc.read().decode(errors="replace")[:400]
+            raise RuntimeError(f"Falha ao sincronizar grade ao vivo ({exc.code}): {detail}") from exc
+
     def _post_reading(self, payload):
-        endpoint = f"{self.config['EDGE_SYNC_TARGET_URL']}/api/edge/readings"
+        endpoint = f"{self.config['EDGE_SYNC_TARGET_URL'].rstrip('/')}/api/edge/readings"
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         req = request.Request(
             endpoint,

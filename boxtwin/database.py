@@ -113,6 +113,13 @@ class Database:
                     last_error TEXT,
                     FOREIGN KEY(reading_id) REFERENCES readings(id)
                 );
+                CREATE TABLE IF NOT EXISTS live_sensor_grids (
+                    node_id TEXT PRIMARY KEY,
+                    captured_at TEXT NOT NULL,
+                    valid_zones INTEGER NOT NULL,
+                    distance_grid_json TEXT NOT NULL,
+                    received_at TEXT NOT NULL
+                );
             """)
             notification_columns = {row[1] for row in connection.execute("PRAGMA table_info(notification_log)")}
             for column in ("provider_message_id", "delivery_status", "recipient_id"):
@@ -120,6 +127,46 @@ class Database:
                     connection.execute(f"ALTER TABLE notification_log ADD COLUMN {column} {'INTEGER' if column == 'recipient_id' else 'TEXT'}")
             connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_readings_uuid ON readings(reading_uuid)")
             connection.execute("CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, id)")
+
+    def upsert_live_sensor_grid(self, payload):
+        """Keep the most recent uncalibrated 8x8 frame for each BoxNode."""
+        received_at = datetime.now(timezone.utc).isoformat()
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO live_sensor_grids
+                    (node_id, captured_at, valid_zones, distance_grid_json, received_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(node_id) DO UPDATE SET
+                    captured_at=excluded.captured_at,
+                    valid_zones=excluded.valid_zones,
+                    distance_grid_json=excluded.distance_grid_json,
+                    received_at=excluded.received_at
+                """,
+                (
+                    payload["node_id"], payload["captured_at"], int(payload["valid_zones"]),
+                    json.dumps(payload["distance_grid_mm"], ensure_ascii=False), received_at,
+                ),
+            )
+        return self.latest_live_sensor_grid(payload["node_id"])
+
+    def latest_live_sensor_grid(self, node_id=None):
+        with self.connect() as connection:
+            if node_id:
+                row = connection.execute(
+                    "SELECT * FROM live_sensor_grids WHERE node_id=?", (node_id,)
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    "SELECT * FROM live_sensor_grids ORDER BY received_at DESC LIMIT 1"
+                ).fetchone()
+        if not row:
+            return None
+        return {
+            "node_id": row["node_id"], "captured_at": row["captured_at"],
+            "received_at": row["received_at"], "valid_zones": row["valid_zones"],
+            "distance_grid_mm": json.loads(row["distance_grid_json"]),
+        }
 
     def save_reading(self, reading):
         created_at = datetime.now(timezone.utc).isoformat()

@@ -100,3 +100,26 @@ def test_edge_ingest_is_idempotent(tmp_path):
     assert first.get_json()["created"] is True
     assert second.status_code == 200
     assert second.get_json()["created"] is False
+
+
+def test_live_grid_is_ingested_and_exposed(tmp_path):
+    app = create_app({
+        "TESTING": True,
+        "DATABASE_PATH": str(tmp_path / "test.db"),
+        "CALIBRATION_PATH": str(tmp_path / "calibration.json"),
+        "SENSOR_MODE": "mock",
+        "EDGE_SYNC_TOKEN": "demo-token",
+    })
+    client = app.test_client()
+    payload = {
+        "node_id": "BOX-RASP-01",
+        "captured_at": "2026-09-13T04:00:00+00:00",
+        "valid_zones": 64,
+        "distance_grid_mm": [[100 + row + column for column in range(8)] for row in range(8)],
+    }
+    response = client.post("/api/edge/live-grid", json=payload, headers={"Authorization": "Bearer demo-token"})
+    assert response.status_code == 201
+    stored = client.get("/api/live-grid?node_id=BOX-RASP-01")
+    assert stored.status_code == 200
+    assert stored.get_json()["distance_grid_mm"] == payload["distance_grid_mm"]
+    assert client.get("/gemeo-sensor").status_code == 200

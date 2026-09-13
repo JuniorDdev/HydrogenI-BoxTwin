@@ -128,6 +128,7 @@ GROQ_API_KEY=gsk_chave_real
 GROQ_MODEL=openai/gpt-oss-120b
 
 EDGE_SYNC_ENABLED=false
+LIVE_SENSOR_SYNC_ENABLED=false
 EDGE_SYNC_TOKEN=mesmo-token-secreto-configurado-no-raspberry
 ```
 
@@ -146,8 +147,12 @@ O Railway injeta `PORT` automaticamente. Não versione `.env`, chaves ou senhas.
 | Resend | `EMAIL_ENABLED`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `ALERT_EMAIL_TO` |
 | Twilio | `TWILIO_ENABLED`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`, `TWILIO_TO`, `TWILIO_VALIDATE_SIGNATURE` |
 | Assistente | `GROQ_ENABLED`, `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_TIMEOUT_SECONDS` |
-| Edge sync | `EDGE_SYNC_ENABLED`, `EDGE_SYNC_TARGET_URL`, `EDGE_SYNC_TOKEN`, `EDGE_SYNC_TIMEOUT_SECONDS`, `EDGE_SYNC_BATCH_SIZE` |
+| Edge sync | `EDGE_SYNC_ENABLED`, `LIVE_SENSOR_SYNC_ENABLED`, `EDGE_SYNC_TARGET_URL`, `EDGE_SYNC_TOKEN`, `EDGE_SYNC_TIMEOUT_SECONDS`, `EDGE_SYNC_BATCH_SIZE` |
 | Retenção | `AUTO_CLEANUP_ENABLED`, `READINGS_RETENTION_DAYS`, `NOTIFICATIONS_RETENTION_DAYS`, `INCIDENTS_RETENTION_DAYS`, `SYNC_QUEUE_RETENTION_DAYS` |
+
+## Gêmeo 3D do sensor sem calibração
+
+Em um BoxNode físico, configure `LIVE_SENSOR_SYNC_ENABLED=true` junto com a sincronização de borda. O Raspberry envia a matriz bruta 8 × 8 periodicamente para o Railway, sem calcular volume ou criar alertas. A visualização remota fica em `/gemeo-sensor` e mostra proximidade relativa ao sensor.
 
 ## Testes
 

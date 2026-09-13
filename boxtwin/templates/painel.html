@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f4f7f5">
+  <title>Painel BoxTwin | HYDROGENI</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='painel.css') }}">
+</head>
+<body class="painel-page">
+  <main class="painel-shell">
+    <aside class="painel-sidebar" aria-label="Navegação do painel">
+      <a class="painel-brand" href="/painel">
+        <span>BT</span>
+        <div><strong>BoxTwin</strong><small>HYDROGENI</small></div>
+      </a>
+      <nav>
+        <a class="active" href="/painel"><span>V</span>Visão geral</a>
+        <a href="/admin"><span>A</span>Admin antigo</a>
+        <a href="/admin/reports"><span>R</span>Relatórios</a>
+        <a href="/simulador"><span>S</span>Simulador</a>
+      </nav>
+      <form method="post" action="/logout">
+        <button class="painel-logout" type="submit">Sair</button>
+      </form>
+    </aside>
+
+    <section class="painel-workspace">
+      <header class="painel-topbar">
+        <div>
+          <p>Central operacional</p>
+          <h1>Dashboard industrial de monitoramento</h1>
+          <span>{{ box_name }} · {{ node_id }}</span>
+        </div>
+        <div class="painel-live">
+          <i></i><span id="painelConnection">Conectando</span><strong id="painelClock">--:--:--</strong>
+        </div>
+      </header>
+
+      <section class="painel-kpis" aria-label="Indicadores principais">
+        <article class="highlight"><p>Volume atual</p><strong id="painelVolume">-</strong><span id="painelTrend">Aguardando leitura</span></article>
+        <article><p>Ocupação</p><strong id="painelOccupancy">-</strong><span>Capacidade estimada</span></article>
+        <article><p>Confiança IA</p><strong id="painelConfidence">-</strong><span>Últimas leituras</span></article>
+        <article><p>Alertas ativos</p><strong id="painelAlerts">-</strong><span>Fila operacional</span></article>
+      </section>
+
+      <section class="painel-grid">
+        <article class="painel-panel chart-panel">
+          <div class="painel-panel-head">
+            <div><p>Histórico em tempo real</p><h2>Volume consolidado</h2></div>
+            <div class="painel-actions">
+              <button data-limit="20" class="selected" type="button">20</button>
+              <button data-limit="50" type="button">50</button>
+              <button data-limit="100" type="button">100</button>
+            </div>
+          </div>
+          <canvas id="painelChart" class="painel-chart" aria-label="Histórico de volume"></canvas>
+        </article>
+
+        <article class="painel-panel">
+          <div class="painel-panel-head">
+            <div><p>Alertas</p><h2>Eventos recentes</h2></div>
+            <button id="painelRefresh" class="painel-icon-button" title="Atualizar painel" type="button">R</button>
+          </div>
+          <div id="painelAlertList" class="painel-alert-list"></div>
+        </article>
+      </section>
+
+      <section class="painel-lower">
+        <article class="painel-panel">
+          <div class="painel-panel-head">
+            <div><p>Ativo</p><h2>Nível do Box</h2></div>
+          </div>
+          <div class="painel-tank-card">
+            <div class="painel-tank" aria-hidden="true"><span id="painelTankFill"></span></div>
+            <div><strong id="painelTankTitle">BoxNode</strong><p id="painelTankVolume">Sem leitura</p><small id="painelTankStatus">Aguardando telemetria</small></div>
+          </div>
+        </article>
+
+        <article class="painel-panel">
+          <div class="painel-panel-head">
+            <div><p>Leituras</p><h2>Últimos registros</h2></div>
+          </div>
+          <div class="painel-table-wrap">
+            <table>
+              <thead><tr><th>Hora</th><th>Volume</th><th>Ocupação</th><th>IA</th><th>Status</th></tr></thead>
+              <tbody id="painelReadings"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </section>
+  </main>
+  <script src="{{ url_for('static', filename='toast.js') }}"></script>
+  <script src="{{ url_for('static', filename='painel.js') }}"></script>
+</body>
+</html>

@@ -23,6 +23,8 @@ PUBLIC_CORS_PATHS = (
     "/api/readings/history",
     "/api/alerts/active",
     "/api/calibration",
+    "/api/sensor/grid",
+    "/api/live-grid",
     "/api/demo/",
 )
 
@@ -68,6 +70,11 @@ def simulator():
     return render_template("simulator.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
 
 
+@bp.get("/gemeo-sensor")
+def live_sensor_twin():
+    return render_template("live_twin.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
+
+
 @bp.route("/app", methods=["GET", "OPTIONS"])
 @bp.route("/mobile", methods=["GET", "OPTIONS"])
 def mobile_app():
@@ -87,7 +94,7 @@ def login():
         if username == current_app.config["ADMIN_USERNAME"] and password_ok:
             session.clear()
             session["admin_authenticated"] = True
-            return redirect(url_for("main.admin"))
+            return redirect(url_for("main.painel"))
         error = "Usuário ou senha inválidos."
     return render_template("login.html", error=error)
 
@@ -102,6 +109,12 @@ def logout():
 @admin_required
 def admin():
     return render_template("admin.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
+
+
+@bp.get("/painel")
+@admin_required
+def painel():
+    return render_template("painel.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
 
 
 @bp.get("/admin/reports")
@@ -215,6 +228,17 @@ def health():
 @bp.post("/api/calibration")
 def calibrate():
     return jsonify(runtime().calibrate())
+
+
+@bp.get("/api/sensor/grid")
+def sensor_grid():
+    return jsonify(runtime().read_raw_sensor_grid())
+
+
+@bp.get("/api/live-grid")
+def live_grid():
+    node_id = request.args.get("node_id", "").strip() or None
+    return jsonify(runtime().database.latest_live_sensor_grid(node_id) or {"status": "no_data"})
 
 
 @bp.post("/api/readings")
@@ -520,6 +544,27 @@ def edge_ingest_reading():
         "reading_uuid": reading["reading_uuid"],
         "created_at": created_at,
     }), 201 if created else 200
+
+
+@bp.post("/api/edge/live-grid")
+def edge_ingest_live_grid():
+    if not valid_edge_token():
+        return jsonify({"accepted": False, "error": "Token inválido."}), 403
+    payload = request.get_json(silent=True) or {}
+    required = {"node_id", "captured_at", "valid_zones", "distance_grid_mm"}
+    missing = sorted(key for key in required if key not in payload)
+    grid = payload.get("distance_grid_mm")
+    if missing:
+        return jsonify({"accepted": False, "error": f"Campos ausentes: {', '.join(missing)}"}), 400
+    if not isinstance(grid, list) or len(grid) != 8 or any(not isinstance(row, list) or len(row) != 8 for row in grid):
+        return jsonify({"accepted": False, "error": "A grade deve conter 8 linhas com 8 zonas."}), 400
+    stored = runtime().database.upsert_live_sensor_grid({
+        "node_id": str(payload["node_id"]),
+        "captured_at": str(payload["captured_at"]),
+        "valid_zones": int(payload["valid_zones"]),
+        "distance_grid_mm": grid,
+    })
+    return jsonify({"accepted": True, "status": "stored", "node_id": stored["node_id"], "received_at": stored["received_at"]}), 201
 
 
 @bp.get("/manifest.webmanifest")

@@ -28,6 +28,22 @@ def test_admin_requires_login(tmp_path):
     assert "/login" in response.headers["Location"]
 
 
+def test_painel_requires_login(tmp_path):
+    response = make_client(tmp_path).get("/painel")
+    assert response.status_code == 302
+    assert "/login" in response.headers["Location"]
+
+
+def test_login_redirects_to_painel_and_renders_dashboard(tmp_path):
+    client = make_client(tmp_path)
+    response = login(client)
+    assert response.status_code == 302
+    assert "/painel" in response.headers["Location"]
+    painel = client.get("/painel")
+    assert painel.status_code == 200
+    assert b"Dashboard industrial de monitoramento" in painel.data
+
+
 def test_admin_login_and_rag(tmp_path):
     client = make_client(tmp_path)
     assert login(client).status_code == 302

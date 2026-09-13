@@ -12,7 +12,7 @@ class BoxTwinRuntime:
     def __init__(self, config, database):
         self.config = config
         self.database = database
-        self.sensor = build_sensor(config["SENSOR_MODE"], config["BOX_HEIGHT_M"])
+        self.sensor = build_sensor(config["SENSOR_MODE"], config["BOX_HEIGHT_M"], config)
         self.calibration = CalibrationService(config["CALIBRATION_PATH"])
         self.volume = VolumeService(config["BOX_LENGTH_M"], config["BOX_WIDTH_M"], config["BOX_HEIGHT_M"])
         self.alerts = AlertService(config["CAPACITY_ALERT_PERCENT"], config["MIN_CONFIDENCE_PERCENT"])
@@ -28,6 +28,24 @@ class BoxTwinRuntime:
         grid = self.sensor.read_distance_grid_mm()
         self.calibration.save(grid)
         return {"calibrated": True, "zones": 64, "message": "Linha de base do box vazio salva."}
+
+    def read_raw_sensor_grid(self):
+        """Return the physical sensor's distance grid without calibration or volume math."""
+        grid = self.sensor.read_distance_grid_mm()
+        payload = {
+            "node_id": self.config["BOX_NODE_ID"],
+            "distance_grid_mm": grid,
+            "valid_zones": sum(value is not None for row in grid for value in row),
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            sync = self.edge_sync.push_live_grid(payload)
+            payload["sync_status"] = sync.get("status", "sent")
+        except Exception as exc:
+            # A visualização local segue útil mesmo quando a internet do BoxNode cair.
+            payload["sync_status"] = "failed"
+            payload["sync_error"] = str(exc)[:200]
+        return payload
 
     def capture(self):
         empty = self.calibration.load()
@@ -90,6 +108,11 @@ class BoxTwinRuntime:
                 self.edge_sync.process_queue()
             except Exception as exc:
                 print(f"[BoxTwin] Falha na sincronização edge/cloud: {exc}")
+            if self.config.get("LIVE_SENSOR_SYNC_ENABLED") and self.config["SENSOR_MODE"] == "vl53l8cx":
+                try:
+                    self.read_raw_sensor_grid()
+                except Exception as exc:
+                    print(f"[BoxTwin] Falha na leitura bruta ao vivo: {exc}")
             try:
                 self.run_cleanup_if_due()
             except Exception as exc:

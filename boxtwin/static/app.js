@@ -1,5 +1,5 @@
 const $ = id => document.getElementById(id);
-const state = { latest: null, health: null, activeScenario: null, activeAlerts: [] };
+const state = { latest: null, health: null, activeScenario: null, activeAlerts: [], rawTimer: null };
 const alertStorageKey = 'boxtwin_intervention_seen_simulator';
 const typeLabels = {capacity:'Capacidade', confidence:'Baixa confiança', obstruction:'Obstrução'};
 const statusLabels = {open:'Aberta', acknowledged:'Ciente', in_progress:'Em atendimento', resolved:'Resolvida', false_positive:'Falso positivo'};
@@ -101,6 +101,21 @@ function renderGrid(data) {
     cell.style.background = colorFor(value, max);
     cell.textContent = (value * 100).toFixed(1);
     cell.title = `Altura: ${(value * 100).toFixed(2)} cm`;
+    grid.appendChild(cell);
+  });
+}
+
+function renderRawGrid(data) {
+  const grid = $('grid');
+  grid.innerHTML = '';
+  const values = data.distance_grid_mm.flat().filter(Number.isFinite);
+  const max = Math.max(...values, 1);
+  data.distance_grid_mm.flat().forEach(value => {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.style.background = Number.isFinite(value) ? colorFor(value, max) : '#27384a';
+    cell.textContent = Number.isFinite(value) ? `${value}` : '—';
+    cell.title = Number.isFinite(value) ? `Distância: ${value} mm` : 'Leitura inválida';
     grid.appendChild(cell);
   });
 }
@@ -314,9 +329,18 @@ function render(data) {
 
 async function request(url, options = {}) {
   const response = await fetch(url, options);
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || data.message || 'Falha na operação.');
+  const contentType = response.headers.get('content-type') || '';
+  const data = contentType.includes('application/json') ? await response.json() : {};
+  if (!response.ok) throw new Error(data.error || data.message || `Falha no servidor (${response.status}).`);
   return data;
+}
+
+async function refreshRawSensor() {
+  const data = await request('/api/sensor/grid');
+  renderRawGrid(data);
+  $('updated').textContent = `Leitura bruta: ${new Date(data.captured_at).toLocaleString('pt-BR')}`;
+  $('zones').textContent = data.valid_zones;
+  $('alerts').innerHTML = '<div class="alert ok">Diagnóstico ao vivo: distâncias em milímetros. Volume requer calibração do box vazio.</div>';
 }
 
 async function loadHistory() {
@@ -382,6 +406,11 @@ async function initialize() {
     } else {
       render(latest);
     }
+    if (!state.health.demo_enabled && latest.status === 'no_data') {
+      $('capture').textContent = 'Atualizar leitura do sensor';
+      await refreshRawSensor();
+      state.rawTimer = window.setInterval(() => refreshRawSensor().catch(error => showToast(error.message, 'error')), 10000);
+    }
     await Promise.all([loadHistory(), loadActiveAlerts()]);
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
     const stream = new EventSource('/api/stream');
@@ -423,6 +452,10 @@ $('stopDemo').onclick = async () => {
 
 $('capture').onclick = async () => {
   try {
+    if (!state.health.demo_enabled && !state.latest?.id) {
+      await refreshRawSensor();
+      return;
+    }
     render(await request('/api/readings',{method:'POST'}));
     await Promise.all([loadHistory(), loadActiveAlerts()]);
   } catch (error) {

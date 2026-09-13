@@ -1,0 +1,12 @@
+Create a clean Portuguese technical wiring infographic. Use input photo as reference for Raspberry Pi 3 Model B+ orientation only: USB/Ethernet at TOP, GPIO on LEFT, microUSB bottom right. Title "Sua Raspberry Pi 3 Model B+ + VL53L8CX". Use simple diagram rather than complex photoreal wires. White background, large readable typography.
+MAIN PANEL: two abstract blocks red "Sensor VL53L8CX" left and green "Raspberry Pi 3 B+" right. Four straight horizontal parallel colored wires and terminal dots, no bends, no crossing:
+left VIN -> RED -> right "Pino físico 1 • 3,3 V*";
+left GND -> BLACK -> right "Pino físico 6 • GND";
+left SDA/MOSI -> GREEN -> right "Pino físico 3 • GPIO2 / SDA";
+left SCL/CLK -> BLUE -> right "Pino físico 5 • GPIO3 / SCL".
+Right terminals ordered 1,6,3,5 intentionally by signal. Label "Esquema por função, não por posição física." Don't draw additional terminals.
+SECOND PANEL: "Onde ficam na sua foto". Small illustration of Pi oriented exactly as reference USB/Rede top, GPIO left. Highlight LOWER END of left GPIO only and point with thin neutral leader to a large SIX PIN inset (2 columns,3 rows only). Title "Extremidade inferior do GPIO • vista de cima". Inset order MUST BE top row LEFT "6 • GND" RIGHT "5 • SCL"; middle row LEFT "4 • 5 V" RIGHT "3 • SDA"; bottom row LEFT "2 • 5 V" RIGHT "1 • 3,3 V". Color circle 6 black,5 blue,3 green,1 red,2and4 gray with no wires. No wires between main panel and inset; mapping by identical colors and numbers only. Label left column "Lado da borda / caixa"; right column "Lado do centro da placa". At bottom "Pino 1: embaixo, na fileira voltada ao centro da placa." Use no numbers on small board photograph. It is only orientation reference, all precise contacts are in inset. Small board must have ONE GPIO strip on left.
+Amber banner below title "ANTES DE LIGAR: a tensão da breakout do sensor ainda precisa ser confirmada." Bottom amber warning "* VIN e sinais devem aceitar 3,3 V para esta ligação direta. Sinais de 1,8 V exigem conversor de nível. Não usar pinos 2 ou 4 (5 V)."
+Bottom small section "Pinos auxiliares do sensor: LPn em nível alto na tensão correta; NCS e SPI_I2C_N em nível baixo para I²C. Conferir resistores existentes no esquema da breakout. MISO e INT sem conexão no teste por polling."
+Last line "Monte com a Raspberry desligada. Este desenho substitui as imagens anteriores."
+Prioritize accurate endpoint labels and six pin inset. Clear whitespace. No crossing wires, no black wire in red terminal, no added wires.
