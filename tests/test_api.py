@@ -146,6 +146,7 @@ def test_admin_analytics_reports_operational_metadata(tmp_path):
         "DATABASE_PATH": str(tmp_path / "test.db"),
         "CALIBRATION_PATH": str(tmp_path / "calibration.json"),
         "SENSOR_MODE": "mock",
+        "EXPECTED_READING_COUNT": 20,
     })
     client = app.test_client()
     client.post("/api/demo/setup")
@@ -162,6 +163,8 @@ def test_admin_analytics_reports_operational_metadata(tmp_path):
     assert payload["kpis"]["readings_count"] == 1
     assert payload["kpis"]["estimated_tons"] > 0
     assert payload["kpis"]["above_expected_count"] == 1
+    assert payload["kpis"]["reading_count_anomaly"] is True
+    assert payload["kpis"]["reading_count_difference"] == -19
     pdf = client.get("/admin/reports/operational.pdf?box_id=BOX-01")
     spreadsheet = client.get("/admin/reports/operational.xlsx?box_id=BOX-01")
     assert pdf.status_code == 200

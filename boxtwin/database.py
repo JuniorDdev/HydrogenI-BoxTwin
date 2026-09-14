@@ -336,6 +336,12 @@ class Database:
         tons = [item["estimated_tons"] for item in items if item["estimated_tons"] is not None]
         expected = [item for item in items if item["expected_volume_m3"] not in (None, 0)]
         deviations = [((item["volume_m3"] - item["expected_volume_m3"]) / item["expected_volume_m3"] * 100) for item in expected]
+        box_counts = {}
+        for item in items:
+            box_counts[item["box_id"] or item["node_id"]] = box_counts.get(item["box_id"] or item["node_id"], 0) + 1
+        expected_readings = max(0, int(filters.get("expected_reading_count") or 0))
+        positive_error_m3 = sum(item["volume_m3"] - item["expected_volume_m3"] for item in expected if item["volume_m3"] > item["expected_volume_m3"])
+        negative_error_m3 = sum(item["expected_volume_m3"] - item["volume_m3"] for item in expected if item["volume_m3"] < item["expected_volume_m3"])
         by_day = {}
         for item in items:
             key = item["created_at"][:10]
@@ -352,6 +358,12 @@ class Database:
                 "estimated_tons": round(sum(tons), 4), "average_reading_ms": round(sum(durations) / len(durations), 1) if durations else None,
                 "above_expected_count": sum(value > 10 for value in deviations), "below_expected_count": sum(value < -10 for value in deviations),
                 "average_deviation_percent": round(sum(deviations) / len(deviations), 2) if deviations else None,
+                "positive_error_m3": round(positive_error_m3, 5), "negative_error_m3": round(negative_error_m3, 5),
+                "reused_boxes_count": sum(1 for count in box_counts.values() if count > 1),
+                "repeat_reads_count": sum(max(0, count - 1) for count in box_counts.values()),
+                "expected_readings": expected_readings,
+                "reading_count_difference": len(items) - expected_readings if expected_readings else None,
+                "reading_count_anomaly": expected_readings > 0 and len(items) != expected_readings,
                 "forecast_next_period_m3": round((sum(volumes) / len(volumes)) * min(30, max(1, len(by_day))), 5) if volumes else 0,
             },
             "series": list(by_day.values()),

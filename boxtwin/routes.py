@@ -159,6 +159,7 @@ def _analytics_filters():
         "material_type": request.args.get("material_type", ""),
         "start": request.args.get("start", ""),
         "end": request.args.get("end", ""),
+        "expected_reading_count": current_app.config.get("EXPECTED_READING_COUNT", 0),
     }
 
 
