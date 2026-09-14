@@ -23,9 +23,12 @@ class BoxTwinRuntime:
         self._stop = threading.Event()
         self._thread = None
         self._last_cleanup_date = None
+        self._last_heartbeat_at = None
+        self._sensor_status = "unknown"
 
     def calibrate(self):
         grid = self.sensor.read_distance_grid_mm()
+        self._sensor_status = "online"
         self.calibration.save(grid)
         return {"calibrated": True, "zones": 64, "message": "Linha de base do box vazio salva."}
 
@@ -56,6 +59,7 @@ class BoxTwinRuntime:
         if empty is None:
             return {"status": "not_calibrated", "message": "Calibre o box vazio antes de medir."}
         current = self.sensor.read_distance_grid_mm()
+        self._sensor_status = "online"
         metrics = self.volume.calculate(empty, current)
         reference_percent = getattr(self.sensor, "reference_percent", None)
         reference_error = (
@@ -134,7 +138,21 @@ class BoxTwinRuntime:
                 try:
                     self.read_raw_sensor_grid()
                 except Exception as exc:
+                    self._sensor_status = "offline"
                     print(f"[BoxTwin] Falha na leitura bruta ao vivo: {exc}")
+            now = datetime.now(timezone.utc)
+            if not self._last_heartbeat_at or (now - self._last_heartbeat_at).total_seconds() >= self.config["HEARTBEAT_INTERVAL_SECONDS"]:
+                try:
+                    latest = self.database.latest()
+                    self.edge_sync.send_heartbeat({
+                        "node_id": self.config["BOX_NODE_ID"],
+                        "sensor_mode": self.config["SENSOR_MODE"],
+                        "sensor_status": self._sensor_status,
+                        "last_reading_at": latest.get("created_at") if latest else None,
+                    })
+                    self._last_heartbeat_at = now
+                except Exception as exc:
+                    print(f"[BoxTwin] Heartbeat não enviado: {exc}")
             try:
                 self.run_cleanup_if_due()
             except Exception as exc:

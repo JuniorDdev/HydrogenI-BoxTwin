@@ -128,6 +128,16 @@ class Database:
                     distance_grid_json TEXT NOT NULL,
                     received_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS box_nodes (
+                    node_id TEXT PRIMARY KEY,
+                    last_seen_at TEXT NOT NULL,
+                    last_reading_at TEXT,
+                    last_sync_at TEXT,
+                    sensor_status TEXT NOT NULL DEFAULT 'unknown',
+                    api_status TEXT NOT NULL DEFAULT 'unknown',
+                    sensor_mode TEXT,
+                    details_json TEXT NOT NULL DEFAULT '{}'
+                );
             """)
             notification_columns = {row[1] for row in connection.execute("PRAGMA table_info(notification_log)")}
             for column in ("provider_message_id", "delivery_status", "recipient_id"):
@@ -137,6 +147,43 @@ class Database:
             connection.execute("CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, id)")
             connection.execute("CREATE INDEX IF NOT EXISTS idx_readings_created_at ON readings(created_at)")
             connection.execute("CREATE INDEX IF NOT EXISTS idx_readings_box_material ON readings(box_id, material_type)")
+
+    def heartbeat(self, payload):
+        now = datetime.now(timezone.utc).isoformat()
+        with self.connect() as connection:
+            connection.execute("""
+                INSERT INTO box_nodes (node_id, last_seen_at, last_reading_at, last_sync_at, sensor_status, api_status, sensor_mode, details_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(node_id) DO UPDATE SET
+                    last_seen_at=excluded.last_seen_at, last_reading_at=COALESCE(excluded.last_reading_at, box_nodes.last_reading_at),
+                    last_sync_at=excluded.last_sync_at, sensor_status=excluded.sensor_status, api_status=excluded.api_status,
+                    sensor_mode=excluded.sensor_mode, details_json=excluded.details_json
+            """, (payload["node_id"], now, payload.get("last_reading_at"), now,
+                  payload.get("sensor_status", "unknown"), payload.get("api_status", "online"),
+                  payload.get("sensor_mode"), json.dumps(payload, ensure_ascii=False)))
+        return self.node_status(payload["node_id"])
+
+    def node_status(self, node_id, offline_after_seconds=120):
+        with self.connect() as connection:
+            node = connection.execute("SELECT * FROM box_nodes WHERE node_id=?", (node_id,)).fetchone()
+            reading = connection.execute("SELECT * FROM readings WHERE node_id=? ORDER BY id DESC LIMIT 1", (node_id,)).fetchone()
+        if not node and not reading:
+            return None
+        result = dict(node) if node else {"node_id": node_id, "sensor_status": "unknown", "api_status": "unknown"}
+        last_seen = result.get("last_seen_at") or (self._serialize(reading).get("created_at") if reading else None)
+        try:
+            stale = (datetime.now(timezone.utc) - datetime.fromisoformat(last_seen.replace("Z", "+00:00"))).total_seconds() > offline_after_seconds
+        except (AttributeError, ValueError):
+            stale = True
+        result["node_status"] = "offline" if stale else "online"
+        result["latest_reading"] = self._serialize(reading) if reading else None
+        result["details"] = json.loads(result.pop("details_json", "{}"))
+        return result
+
+    def latest_for_node(self, node_id):
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM readings WHERE node_id=? ORDER BY id DESC LIMIT 1", (node_id,)).fetchone()
+        return self._serialize(row) if row else None
 
     def upsert_live_sensor_grid(self, payload):
         """Keep the most recent uncalibrated 8x8 frame for each BoxNode."""

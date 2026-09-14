@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -11,6 +12,10 @@ def _bool(name, default=False):
 def load_config():
     load_dotenv()
     root = Path(__file__).resolve().parent.parent
+    try:
+        node_tokens = json.loads(os.getenv("EDGE_NODE_TOKENS", "{}"))
+    except json.JSONDecodeError:
+        node_tokens = {}
     return {
         "APP_HOST": os.getenv("APP_HOST", "0.0.0.0"),
         "APP_PORT": int(os.getenv("PORT", os.getenv("APP_PORT", "5000"))),
@@ -58,6 +63,9 @@ def load_config():
         "EDGE_SYNC_TOKEN": os.getenv("EDGE_SYNC_TOKEN", ""),
         "EDGE_SYNC_TIMEOUT_SECONDS": int(os.getenv("EDGE_SYNC_TIMEOUT_SECONDS", "15")),
         "EDGE_SYNC_BATCH_SIZE": int(os.getenv("EDGE_SYNC_BATCH_SIZE", "20")),
+        "EDGE_NODE_TOKENS": node_tokens if isinstance(node_tokens, dict) else {},
+        "HEARTBEAT_INTERVAL_SECONDS": int(os.getenv("HEARTBEAT_INTERVAL_SECONDS", "30")),
+        "NODE_OFFLINE_AFTER_SECONDS": int(os.getenv("NODE_OFFLINE_AFTER_SECONDS", "120")),
         "AUTO_CLEANUP_ENABLED": _bool("AUTO_CLEANUP_ENABLED", True),
         "READINGS_RETENTION_DAYS": int(os.getenv("READINGS_RETENTION_DAYS", "45")),
         "NOTIFICATIONS_RETENTION_DAYS": int(os.getenv("NOTIFICATIONS_RETENTION_DAYS", "60")),

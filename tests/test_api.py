@@ -125,6 +125,25 @@ def test_live_grid_is_ingested_and_exposed(tmp_path):
     assert client.get("/gemeo-sensor").status_code == 200
 
 
+def test_boxnode_heartbeat_authentication_and_dynamic_monitor(tmp_path):
+    app = create_app({
+        "TESTING": True, "DATABASE_PATH": str(tmp_path / "test.db"),
+        "CALIBRATION_PATH": str(tmp_path / "calibration.json"), "SENSOR_MODE": "mock",
+        "EDGE_NODE_TOKENS": {"BOX-01": "box-01-token"}, "NODE_OFFLINE_AFTER_SECONDS": 120,
+    })
+    client = app.test_client()
+    missing = client.post("/api/edge/heartbeat", json={})
+    invalid = client.post("/api/edge/heartbeat", json={"node_id": "BOX-01"}, headers={"Authorization": "Bearer wrong"})
+    accepted = client.post("/api/edge/heartbeat", json={"node_id": "BOX-01", "sensor_status": "online", "sensor_mode": "vl53l8cx"}, headers={"Authorization": "Bearer box-01-token"})
+    assert missing.status_code == 400
+    assert invalid.status_code == 403
+    assert accepted.status_code == 200
+    status = client.get("/api/boxes/BOX-01").get_json()
+    assert status["node_status"] == "online"
+    assert status["sensor_status"] == "online"
+    assert client.get("/box/BOX-01").status_code == 200
+
+
 def test_local_raw_read_is_cached_for_the_live_twin(tmp_path):
     app = create_app({
         "TESTING": True,

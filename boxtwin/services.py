@@ -293,8 +293,16 @@ class EdgeSyncService:
             detail = exc.read().decode(errors="replace")[:400]
             raise RuntimeError(f"Falha ao sincronizar grade ao vivo ({exc.code}): {detail}") from exc
 
+    def send_heartbeat(self, payload):
+        if not self.enabled():
+            return {"status": "disabled"}
+        return self._post_json("/api/edge/heartbeat", payload, "HydrogenI-BoxTwin-Heartbeat/1.0")
+
     def _post_reading(self, payload):
-        endpoint = f"{self.config['EDGE_SYNC_TARGET_URL'].rstrip('/')}/api/edge/readings"
+        return self._post_json("/api/edge/readings", payload, "HydrogenI-BoxTwin-EdgeSync/1.0")
+
+    def _post_json(self, path, payload, user_agent):
+        endpoint = f"{self.config['EDGE_SYNC_TARGET_URL'].rstrip('/')}{path}"
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         req = request.Request(
             endpoint,
@@ -302,7 +310,7 @@ class EdgeSyncService:
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.config['EDGE_SYNC_TOKEN']}",
-                "User-Agent": "HydrogenI-BoxTwin-EdgeSync/1.0",
+                "User-Agent": user_agent,
             },
             method="POST",
         )

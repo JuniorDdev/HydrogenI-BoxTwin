@@ -75,6 +75,11 @@ def live_sensor_twin():
     return render_template("live_twin.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
 
 
+@bp.get("/box/<node_id>")
+def box_monitor(node_id):
+    return render_template("box_monitor.html", node_id=node_id)
+
+
 @bp.route("/app", methods=["GET", "OPTIONS"])
 @bp.route("/mobile", methods=["GET", "OPTIONS"])
 def mobile_app():
@@ -280,7 +285,14 @@ def capture():
 
 @bp.get("/api/readings/latest")
 def latest():
-    return jsonify(runtime().database.latest() or {"status": "no_data"})
+    node_id = request.args.get("node_id", "").strip()
+    item = runtime().database.latest_for_node(node_id) if node_id else runtime().database.latest()
+    return jsonify(item or {"status": "no_data"})
+
+
+@bp.get("/api/boxes/<node_id>")
+def box_status(node_id):
+    return jsonify(runtime().database.node_status(node_id, current_app.config["NODE_OFFLINE_AFTER_SECONDS"]) or {"status": "no_data", "node_id": node_id})
 
 
 @bp.get("/api/readings/history")
@@ -301,11 +313,12 @@ def active_alerts():
 def stream():
     # Captura o runtime fora do gerador, evitando erro de contexto
     rt = runtime()
+    node_id = request.args.get("node_id", "").strip()
 
     def events():
         last_id = None
         while True:
-            reading = rt.database.latest()
+            reading = rt.database.latest_for_node(node_id) if node_id else rt.database.latest()
             if reading and reading["id"] != last_id:
                 last_id = reading["id"]
                 yield f"event: reading\ndata: {json.dumps(reading)}\n\n"
@@ -430,8 +443,9 @@ def valid_twilio_signature():
     return hmac.compare_digest(signature, expected)
 
 
-def valid_edge_token():
-    configured = current_app.config.get("EDGE_SYNC_TOKEN", "")
+def valid_edge_token(node_id=None):
+    node_tokens = current_app.config.get("EDGE_NODE_TOKENS", {})
+    configured = node_tokens.get(node_id) if node_id and node_tokens else current_app.config.get("EDGE_SYNC_TOKEN", "")
     if not configured:
         return False
     auth_header = request.headers.get("Authorization", "")
@@ -533,9 +547,11 @@ def sync_status():
 
 @bp.post("/api/edge/readings")
 def edge_ingest_reading():
-    if not valid_edge_token():
-        return jsonify({"accepted": False, "error": "Token inválido."}), 403
     payload = request.get_json(silent=True) or {}
+    if not str(payload.get("node_id", "")).strip():
+        return jsonify({"accepted": False, "error": "node_id ausente."}), 400
+    if not valid_edge_token(str(payload.get("node_id", ""))):
+        return jsonify({"accepted": False, "error": "Token inválido."}), 403
     required = {
         "reading_uuid",
         "node_id",
@@ -572,6 +588,7 @@ def edge_ingest_reading():
         "estimated_tons": payload.get("estimated_tons"), "reading_duration_ms": payload.get("reading_duration_ms"),
     }
     reading_id, created_at, created = runtime().database.ingest_synced_reading(reading)
+    runtime().database.heartbeat({"node_id": reading["node_id"], "last_reading_at": created_at, "sensor_status": "online", "api_status": "online"})
     return jsonify({
         "accepted": True,
         "created": created,
@@ -583,9 +600,11 @@ def edge_ingest_reading():
 
 @bp.post("/api/edge/live-grid")
 def edge_ingest_live_grid():
-    if not valid_edge_token():
-        return jsonify({"accepted": False, "error": "Token inválido."}), 403
     payload = request.get_json(silent=True) or {}
+    if not str(payload.get("node_id", "")).strip():
+        return jsonify({"accepted": False, "error": "node_id ausente."}), 400
+    if not valid_edge_token(str(payload.get("node_id", ""))):
+        return jsonify({"accepted": False, "error": "Token inválido."}), 403
     required = {"node_id", "captured_at", "valid_zones", "distance_grid_mm"}
     missing = sorted(key for key in required if key not in payload)
     grid = payload.get("distance_grid_mm")
@@ -599,7 +618,25 @@ def edge_ingest_live_grid():
         "valid_zones": int(payload["valid_zones"]),
         "distance_grid_mm": grid,
     })
+    runtime().database.heartbeat({"node_id": stored["node_id"], "sensor_status": "online", "api_status": "online"})
     return jsonify({"accepted": True, "status": "stored", "node_id": stored["node_id"], "received_at": stored["received_at"]}), 201
+
+
+@bp.post("/api/edge/heartbeat")
+def edge_heartbeat():
+    payload = request.get_json(silent=True) or {}
+    node_id = str(payload.get("node_id", "")).strip()
+    if not node_id:
+        return jsonify({"accepted": False, "error": "node_id ausente."}), 400
+    if not valid_edge_token(node_id):
+        return jsonify({"accepted": False, "error": "Token inválido."}), 403
+    return jsonify({"accepted": True, "node": runtime().database.heartbeat({
+        "node_id": node_id,
+        "last_reading_at": payload.get("last_reading_at"),
+        "sensor_status": payload.get("sensor_status", "unknown"),
+        "api_status": "online",
+        "sensor_mode": payload.get("sensor_mode"),
+    })})
 
 
 @bp.get("/manifest.webmanifest")

@@ -57,7 +57,8 @@ function drawTwin(grid) {
 
 async function refresh() {
   try {
-    const response = await fetch('/api/live-grid', { cache: 'no-store' });
+    const nodeId = new URLSearchParams(location.search).get('node_id');
+    const response = await fetch(`/api/live-grid${nodeId ? `?node_id=${encodeURIComponent(nodeId)}` : ''}`, { cache: 'no-store' });
     const data = await response.json();
     document.getElementById('refreshedAt').textContent = new Date().toLocaleTimeString('pt-BR');
     if (data.status === 'no_data') {
