@@ -138,3 +138,33 @@ def test_local_raw_read_is_cached_for_the_live_twin(tmp_path):
     cached = client.get("/api/live-grid").get_json()
     assert cached["valid_zones"] == 64
     assert cached["distance_grid_mm"] == raw.get_json()["distance_grid_mm"]
+
+
+def test_admin_analytics_reports_operational_metadata(tmp_path):
+    app = create_app({
+        "TESTING": True,
+        "DATABASE_PATH": str(tmp_path / "test.db"),
+        "CALIBRATION_PATH": str(tmp_path / "calibration.json"),
+        "SENSOR_MODE": "mock",
+    })
+    client = app.test_client()
+    client.post("/api/demo/setup")
+    response = client.post("/api/readings", json={"metadata": {
+        "box_id": "BOX-01", "sensor_id": "SENSOR-01", "material_type": "granel",
+        "material_name": "Fertilizante", "density_t_m3": 1.2, "expected_volume_m3": 0.01,
+    }})
+    assert response.status_code == 201
+    with client.session_transaction() as session:
+        session["admin_authenticated"] = True
+    analytics = client.get("/api/admin/analytics?box_id=BOX-01&material_type=granel")
+    assert analytics.status_code == 200
+    payload = analytics.get_json()
+    assert payload["kpis"]["readings_count"] == 1
+    assert payload["kpis"]["estimated_tons"] > 0
+    assert payload["kpis"]["above_expected_count"] == 1
+    pdf = client.get("/admin/reports/operational.pdf?box_id=BOX-01")
+    spreadsheet = client.get("/admin/reports/operational.xlsx?box_id=BOX-01")
+    assert pdf.status_code == 200
+    assert pdf.mimetype == "application/pdf"
+    assert spreadsheet.status_code == 200
+    assert spreadsheet.mimetype == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

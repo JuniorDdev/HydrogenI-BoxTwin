@@ -40,7 +40,7 @@ def _fmt(value, digits=1, suffix=""):
     return f"{float(value):.{digits}f}{suffix}".replace(".", ",")
 
 
-def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, readings, anomalies):
+def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, readings, anomalies, analytics=None):
     output = BytesIO()
     styles = getSampleStyleSheet()
     title = ParagraphStyle("TitleBoxTwin", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=22, leading=26, textColor=NAVY, spaceAfter=5)
@@ -92,10 +92,11 @@ def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, read
     story.extend([header, Spacer(1, 6 * mm)])
 
     status_text = "Sem leituras" if not latest else ("Alerta ativo" if latest.get("status") == "alert" else "Operação normal")
+    analytics_kpis = (analytics or {}).get("kpis", {})
     kpis = [
         ("OCUPAÇÃO ATUAL", _fmt(latest.get("capacity_percent") if latest else None, 1, "%")),
-        ("VOLUME ESTIMADO", _fmt(latest.get("volume_m3") if latest else None, 4, " m³")),
-        ("CONFIANÇA MÉDIA", _fmt(avg_confidence, 1, "%")),
+        ("VOLUME TOTAL", _fmt(analytics_kpis.get("total_volume_m3", sum(item.get("volume_m3", 0) for item in readings)), 4, " m³")),
+        ("TONELADAS EST.", _fmt(analytics_kpis.get("estimated_tons"), 3, " t")),
         ("INCIDENTES ATIVOS", str(active_count)),
     ]
     kpi_table = Table([[Table([[Paragraph(value, kpi_value)], [Paragraph(label, kpi_label)]]) for label, value in kpis]], colWidths=[43.25 * mm] * 4)
@@ -110,7 +111,8 @@ def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, read
     summary_data = [
         ["Gerado em", generated_at, "Modo do sensor", "Simulado" if sensor_mode == "mock" else "Físico"],
         ["Estado atual", status_text, "Leituras analisadas", str(len(readings))],
-        ["Pico de ocupação", _fmt(max_capacity, 1, "%"), "Incidentes registrados", str(len(anomalies))],
+        ["Pico de ocupação", _fmt(max_capacity, 1, "%"), "Tempo médio de leitura", _fmt(analytics_kpis.get("average_reading_ms"), 0, " ms")],
+        ["Desvios > +10%", str(analytics_kpis.get("above_expected_count", 0)), "Desvios < -10%", str(analytics_kpis.get("below_expected_count", 0))],
         ["Dimensões internas", f"{dimensions['length']} m x {dimensions['width']} m x {dimensions['height']} m", "Última leitura", _local_datetime(latest.get("created_at")) if latest else "-"],
     ]
     summary = Table(summary_data, colWidths=[31 * mm, 55.5 * mm, 31 * mm, 55.5 * mm])
@@ -124,16 +126,16 @@ def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, read
     story.append(summary)
 
     story.append(Paragraph("Leituras recentes", section))
-    reading_rows = [["Data e hora", "Cenário", "Volume (m³)", "Ocupação", "Confiança", "Estado"]]
+    reading_rows = [["Data e hora", "Box / sensor", "Material", "Volume (m³)", "t est.", "Desvio", "Estado"]]
     for item in list(reversed(readings))[:25]:
         reading_rows.append([
-            _local_datetime(item.get("created_at")), str(item.get("scenario") or "fisico"), _fmt(item.get("volume_m3"), 4),
-            _fmt(item.get("capacity_percent"), 1, "%"), _fmt(item.get("confidence_percent"), 1, "%"),
+            _local_datetime(item.get("created_at")), f"{item.get('box_id') or node_id}\n{item.get('sensor_id') or node_id}", str(item.get("material_name") or item.get("material_type") or "-"), _fmt(item.get("volume_m3"), 4),
+            _fmt(item.get("estimated_tons"), 3), _fmt(((item["volume_m3"] - item["expected_volume_m3"]) / item["expected_volume_m3"] * 100) if item.get("expected_volume_m3") else None, 1, "%"),
             "Alerta" if item.get("status") == "alert" else "Normal",
         ])
     if len(reading_rows) == 1:
         reading_rows.append(["Nenhuma leitura disponível", "-", "-", "-", "-", "-"])
-    readings_table = Table(reading_rows, repeatRows=1, colWidths=[32 * mm, 29 * mm, 27 * mm, 25 * mm, 27 * mm, 33 * mm])
+    readings_table = Table(reading_rows, repeatRows=1, colWidths=[27 * mm, 31 * mm, 27 * mm, 24 * mm, 18 * mm, 19 * mm, 27 * mm])
     readings_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), NAVY), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"), ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
@@ -176,7 +178,7 @@ def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, read
     return output.getvalue()
 
 
-def build_operational_workbook(*, box_name, node_id, sensor_mode, dimensions, readings, anomalies):
+def build_operational_workbook(*, box_name, node_id, sensor_mode, dimensions, readings, anomalies, analytics=None):
     workbook = Workbook()
     summary_sheet = workbook.active
     summary_sheet.title = "Resumo"
@@ -196,6 +198,17 @@ def build_operational_workbook(*, box_name, node_id, sensor_mode, dimensions, re
         dimensions["height"],
         dimensions["length"] * dimensions["width"] * dimensions["height"],
     ])
+    kpis = (analytics or {}).get("kpis", {})
+    summary_sheet.append([])
+    summary_sheet.append(["Indicador", "Valor"])
+    summary_sheet.append(["Leituras", kpis.get("readings_count", len(readings))])
+    summary_sheet.append(["Boxes únicos", kpis.get("unique_boxes", 0)])
+    summary_sheet.append(["Volume total (m³)", kpis.get("total_volume_m3", 0)])
+    summary_sheet.append(["Volume médio (m³)", kpis.get("average_volume_m3", 0)])
+    summary_sheet.append(["Toneladas estimadas", kpis.get("estimated_tons", 0)])
+    summary_sheet.append(["Tempo médio de leitura (ms)", kpis.get("average_reading_ms")])
+    summary_sheet.append(["Acima de +10% esperado", kpis.get("above_expected_count", 0)])
+    summary_sheet.append(["Abaixo de -10% esperado", kpis.get("below_expected_count", 0)])
 
     readings_sheet = workbook.create_sheet("Leituras")
     readings_sheet.append([
@@ -208,6 +221,14 @@ def build_operational_workbook(*, box_name, node_id, sensor_mode, dimensions, re
         "Confiança (%)",
         "Zonas válidas",
         "Estado",
+        "Box",
+        "Sensor",
+        "Tipo de material",
+        "Material",
+        "Densidade (t/m³)",
+        "Volume esperado (m³)",
+        "Toneladas estimadas",
+        "Tempo de leitura (ms)",
     ])
     for item in readings:
         readings_sheet.append([
@@ -220,6 +241,14 @@ def build_operational_workbook(*, box_name, node_id, sensor_mode, dimensions, re
             item.get("confidence_percent"),
             item.get("valid_zones"),
             item.get("status"),
+            item.get("box_id"),
+            item.get("sensor_id"),
+            item.get("material_type"),
+            item.get("material_name"),
+            item.get("density_t_m3"),
+            item.get("expected_volume_m3"),
+            item.get("estimated_tons"),
+            item.get("reading_duration_ms"),
         ])
 
     anomalies_sheet = workbook.create_sheet("Tratativas")

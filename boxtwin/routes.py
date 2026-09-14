@@ -123,6 +123,12 @@ def reports_page():
     return render_template("reports.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
 
 
+@bp.get("/admin/analytics")
+@admin_required
+def analytics_page():
+    return render_template("analytics.html", box_name=current_app.config["BOX_NAME"], node_id=current_app.config["BOX_NODE_ID"])
+
+
 @bp.get("/api/admin/summary")
 @admin_required
 def admin_summary():
@@ -140,6 +146,22 @@ def admin_summary():
     })
 
 
+@bp.get("/api/admin/analytics")
+@admin_required
+def admin_analytics():
+    return jsonify(runtime().database.analytics(_analytics_filters()))
+
+
+def _analytics_filters():
+    return {
+        "sensor_id": request.args.get("sensor_id", ""),
+        "box_id": request.args.get("box_id", ""),
+        "material_type": request.args.get("material_type", ""),
+        "start": request.args.get("start", ""),
+        "end": request.args.get("end", ""),
+    }
+
+
 @bp.get("/admin/reports/operational.pdf")
 @admin_required
 def operational_report():
@@ -147,7 +169,8 @@ def operational_report():
         limit = max(10, min(int(request.args.get("limit", 50)), 100))
     except ValueError:
         limit = 50
-    readings = runtime().database.history(limit)
+    analytics = runtime().database.analytics(_analytics_filters())
+    readings = analytics["items"][-limit:]
     anomaly_items = runtime().database.anomalies(limit)
     pdf_bytes = build_operational_report(
         box_name=current_app.config["BOX_NAME"],
@@ -160,6 +183,7 @@ def operational_report():
         },
         readings=readings,
         anomalies=anomaly_items,
+        analytics=analytics,
     )
     filename = f"relatorio_boxtwin_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.pdf"
     response = send_file(BytesIO(pdf_bytes), mimetype="application/pdf", as_attachment=True, download_name=filename)
@@ -174,7 +198,8 @@ def operational_report_excel():
         limit = max(10, min(int(request.args.get("limit", 200)), 500))
     except ValueError:
         limit = 200
-    readings = runtime().database.history(limit)
+    analytics = runtime().database.analytics(_analytics_filters())
+    readings = analytics["items"][-limit:]
     anomalies = runtime().database.anomalies(limit, request.args.get("status"))
     workbook_bytes = build_operational_workbook(
         box_name=current_app.config["BOX_NAME"],
@@ -187,6 +212,7 @@ def operational_report_excel():
         },
         readings=readings,
         anomalies=anomalies,
+        analytics=analytics,
     )
     filename = f"relatorio_boxtwin_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.xlsx"
     response = send_file(
@@ -246,7 +272,8 @@ def live_grid():
 
 @bp.post("/api/readings")
 def capture():
-    result = runtime().capture()
+    payload = request.get_json(silent=True) or {}
+    result = runtime().capture(payload.get("metadata"))
     return jsonify(result), 409 if result.get("status") == "not_calibrated" else 201
 
 
@@ -538,6 +565,10 @@ def edge_ingest_reading():
         "average_height_m": payload.get("average_height_m"),
         "maximum_height_m": payload.get("maximum_height_m"),
         "capacity_m3": payload.get("capacity_m3"),
+        "box_id": payload.get("box_id"), "sensor_id": payload.get("sensor_id"),
+        "material_type": payload.get("material_type"), "material_name": payload.get("material_name"),
+        "density_t_m3": payload.get("density_t_m3"), "expected_volume_m3": payload.get("expected_volume_m3"),
+        "estimated_tons": payload.get("estimated_tons"), "reading_duration_ms": payload.get("reading_duration_ms"),
     }
     reading_id, created_at, created = runtime().database.ingest_synced_reading(reading)
     return jsonify({

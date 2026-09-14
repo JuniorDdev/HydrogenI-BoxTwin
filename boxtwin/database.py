@@ -44,6 +44,14 @@ class Database:
                 "average_height_m": "REAL",
                 "maximum_height_m": "REAL",
                 "capacity_m3": "REAL",
+                "box_id": "TEXT",
+                "sensor_id": "TEXT",
+                "material_type": "TEXT",
+                "material_name": "TEXT",
+                "density_t_m3": "REAL",
+                "expected_volume_m3": "REAL",
+                "estimated_tons": "REAL",
+                "reading_duration_ms": "INTEGER",
             }
             for column, column_type in migrations.items():
                 if column not in existing:
@@ -127,6 +135,8 @@ class Database:
                     connection.execute(f"ALTER TABLE notification_log ADD COLUMN {column} {'INTEGER' if column == 'recipient_id' else 'TEXT'}")
             connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_readings_uuid ON readings(reading_uuid)")
             connection.execute("CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, id)")
+            connection.execute("CREATE INDEX IF NOT EXISTS idx_readings_created_at ON readings(created_at)")
+            connection.execute("CREATE INDEX IF NOT EXISTS idx_readings_box_material ON readings(box_id, material_type)")
 
     def upsert_live_sensor_grid(self, payload):
         """Keep the most recent uncalibrated 8x8 frame for each BoxNode."""
@@ -176,8 +186,10 @@ class Database:
                     reading_uuid, created_at, node_id, volume_m3, capacity_percent,
                     confidence_percent, valid_zones, status, alerts_json, grid_json
                     , scenario, reference_percent, reference_error_points,
-                    average_height_m, maximum_height_m, capacity_m3
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    average_height_m, maximum_height_m, capacity_m3, box_id, sensor_id,
+                    material_type, material_name, density_t_m3, expected_volume_m3,
+                    estimated_tons, reading_duration_ms
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 reading["reading_uuid"], created_at, reading["node_id"], reading["volume_m3"], reading["capacity_percent"],
                 reading["confidence_percent"], reading["valid_zones"], reading["status"],
@@ -185,6 +197,10 @@ class Database:
                 reading.get("scenario"), reading.get("reference_percent"),
                 reading.get("reference_error_points"), reading.get("average_height_m"),
                 reading.get("maximum_height_m"), reading.get("capacity_m3"),
+                reading.get("box_id") or reading["node_id"], reading.get("sensor_id") or reading["node_id"],
+                reading.get("material_type") or "nao_informado", reading.get("material_name") or "Não informado",
+                reading.get("density_t_m3"), reading.get("expected_volume_m3"),
+                reading.get("estimated_tons"), reading.get("reading_duration_ms"),
             ))
             return cursor.lastrowid, created_at
 
@@ -289,6 +305,57 @@ class Database:
         with self.connect() as connection:
             rows = connection.execute("SELECT * FROM readings ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return [self._serialize(row) for row in reversed(rows)]
+
+    def analytics(self, filters=None):
+        """Return manager KPIs while keeping legacy readings usable."""
+        filters = filters or {}
+        clauses, params = [], []
+        for key, column in (("sensor_id", "sensor_id"), ("box_id", "box_id"), ("material_type", "material_type")):
+            value = (filters.get(key) or "").strip()
+            if value:
+                clauses.append(f"COALESCE({column}, node_id)=?")
+                params.append(value)
+        start, end = (filters.get("start") or "").strip(), (filters.get("end") or "").strip()
+        if start:
+            clauses.append("created_at >= ?")
+            params.append(start)
+        if end:
+            clauses.append("created_at <= ?")
+            params.append(end + "T23:59:59.999999+00:00" if len(end) == 10 else end)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        with self.connect() as connection:
+            rows = connection.execute(f"SELECT * FROM readings{where} ORDER BY created_at", params).fetchall()
+            options = {
+                "sensors": [row[0] for row in connection.execute("SELECT DISTINCT COALESCE(sensor_id,node_id) FROM readings ORDER BY 1")],
+                "boxes": [row[0] for row in connection.execute("SELECT DISTINCT COALESCE(box_id,node_id) FROM readings ORDER BY 1")],
+                "materials": [row[0] for row in connection.execute("SELECT DISTINCT COALESCE(material_type,'nao_informado') FROM readings ORDER BY 1")],
+            }
+        items = [self._serialize(row) for row in rows]
+        volumes = [item["volume_m3"] for item in items]
+        durations = [item["reading_duration_ms"] for item in items if item["reading_duration_ms"] is not None]
+        tons = [item["estimated_tons"] for item in items if item["estimated_tons"] is not None]
+        expected = [item for item in items if item["expected_volume_m3"] not in (None, 0)]
+        deviations = [((item["volume_m3"] - item["expected_volume_m3"]) / item["expected_volume_m3"] * 100) for item in expected]
+        by_day = {}
+        for item in items:
+            key = item["created_at"][:10]
+            bucket = by_day.setdefault(key, {"date": key, "readings": 0, "volume_m3": 0.0, "estimated_tons": 0.0})
+            bucket["readings"] += 1
+            bucket["volume_m3"] += item["volume_m3"]
+            bucket["estimated_tons"] += item["estimated_tons"] or 0
+        return {
+            "filters": options,
+            "items": items,
+            "kpis": {
+                "readings_count": len(items), "unique_boxes": len({item["box_id"] for item in items}),
+                "total_volume_m3": round(sum(volumes), 5), "average_volume_m3": round(sum(volumes) / len(volumes), 5) if volumes else 0,
+                "estimated_tons": round(sum(tons), 4), "average_reading_ms": round(sum(durations) / len(durations), 1) if durations else None,
+                "above_expected_count": sum(value > 10 for value in deviations), "below_expected_count": sum(value < -10 for value in deviations),
+                "average_deviation_percent": round(sum(deviations) / len(deviations), 2) if deviations else None,
+                "forecast_next_period_m3": round((sum(volumes) / len(volumes)) * min(30, max(1, len(by_day))), 5) if volumes else 0,
+            },
+            "series": list(by_day.values()),
+        }
 
     def save_anomalies(self, reading_id, alerts):
         created_at = datetime.now(timezone.utc).isoformat()
@@ -559,4 +626,8 @@ class Database:
             "reference_error_points": row["reference_error_points"],
             "average_height_m": row["average_height_m"],
             "maximum_height_m": row["maximum_height_m"], "capacity_m3": row["capacity_m3"],
+            "box_id": row["box_id"] or row["node_id"], "sensor_id": row["sensor_id"] or row["node_id"],
+            "material_type": row["material_type"] or "nao_informado", "material_name": row["material_name"] or "Não informado",
+            "density_t_m3": row["density_t_m3"], "expected_volume_m3": row["expected_volume_m3"],
+            "estimated_tons": row["estimated_tons"], "reading_duration_ms": row["reading_duration_ms"],
         }

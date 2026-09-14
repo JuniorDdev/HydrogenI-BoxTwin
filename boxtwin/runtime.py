@@ -49,7 +49,9 @@ class BoxTwinRuntime:
             payload["sync_error"] = str(exc)[:200]
         return payload
 
-    def capture(self):
+    def capture(self, metadata=None):
+        metadata = metadata or {}
+        started_at = datetime.now(timezone.utc)
         empty = self.calibration.load()
         if empty is None:
             return {"status": "not_calibrated", "message": "Calibre o box vazio antes de medir."}
@@ -61,6 +63,16 @@ class BoxTwinRuntime:
             if reference_percent is not None else None
         )
         alerts = self.alerts.evaluate(metrics)
+        expected_volume_m3 = float(metadata.get("expected_volume_m3") or self.config.get("EXPECTED_VOLUME_M3") or 0)
+        if expected_volume_m3:
+            difference_percent = (metrics["volume_m3"] - expected_volume_m3) / expected_volume_m3 * 100
+            if abs(difference_percent) > 10:
+                alerts.append({
+                    "type": "expected_volume_deviation",
+                    "level": "warning",
+                    "message": f"Volume {abs(difference_percent):.1f}% {'acima' if difference_percent > 0 else 'abaixo'} do esperado.",
+                })
+        density_t_m3 = float(metadata.get("density_t_m3") or self.config.get("MATERIAL_DENSITY_T_M3") or 0)
         reading_uuid = str(uuid4())
         reading = {
             **metrics,
@@ -73,6 +85,14 @@ class BoxTwinRuntime:
             "distance_grid_mm": current,
             "status": "alert" if alerts else "normal",
             "alerts": alerts,
+            "box_id": str(metadata.get("box_id") or self.config["BOX_NODE_ID"]),
+            "sensor_id": str(metadata.get("sensor_id") or self.config["BOX_NODE_ID"]),
+            "material_type": str(metadata.get("material_type") or self.config.get("MATERIAL_TYPE") or "nao_informado"),
+            "material_name": str(metadata.get("material_name") or self.config.get("MATERIAL_NAME") or "Não informado"),
+            "density_t_m3": density_t_m3 or None,
+            "expected_volume_m3": expected_volume_m3 or None,
+            "estimated_tons": round(metrics["volume_m3"] * density_t_m3, 4) if density_t_m3 else None,
+            "reading_duration_ms": int((datetime.now(timezone.utc) - started_at).total_seconds() * 1000),
         }
         reading_id, created_at = self.database.save_reading(reading)
         reading["created_at"] = created_at
