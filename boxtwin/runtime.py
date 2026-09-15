@@ -53,7 +53,7 @@ class BoxTwinRuntime:
             payload["sync_error"] = str(exc)[:200]
         return payload
 
-    def capture(self, metadata=None):
+    def capture(self, metadata=None, notify=True):
         metadata = metadata or {}
         started_at = datetime.now(timezone.utc)
         empty = self.calibration.load()
@@ -102,7 +102,8 @@ class BoxTwinRuntime:
         reading_id, created_at = self.database.save_reading(reading)
         reading["created_at"] = created_at
         anomaly_records = self.database.save_anomalies(reading_id, alerts)
-        self.notifications.dispatch(anomaly_records)
+        if notify:
+            self.notifications.dispatch(anomaly_records)
         sync_payload = {
             **reading,
             "id": reading_id,
@@ -148,11 +149,8 @@ class BoxTwinRuntime:
             })
 
     def _loop(self):
-        # Captura e alerta acontecem só por requisição explícita (botão "Capturar" no simulador,
-        # POST /api/readings, ou sincronização de borda) — este laço de fundo NÃO chama self.capture()
-        # sozinho. Antes ele capturava automaticamente a cada SAMPLE_INTERVAL_SECONDS, o que gerava
-        # alertas/e-mails repetidos sem ninguém ter pedido. As tarefas de manutenção abaixo continuam
-        # rodando no mesmo intervalo.
+        # A captura automática é opcional. Quando ativada, mantém o painel central atualizado
+        # sem disparar repetidamente e-mails/WhatsApp para o mesmo estado.
         while not self._stop.is_set():
             try:
                 self.notifications.dispatch_escalations()
@@ -185,6 +183,14 @@ class BoxTwinRuntime:
                 except Exception as exc:
                     self._sensor_status = "offline"
                     print(f"[BoxTwin] Falha na leitura bruta ao vivo: {exc}")
+            if self.config.get("LIVE_MEASUREMENT_ENABLED") and self.config["SENSOR_MODE"] == "vl53l8cx":
+                if self.calibration.load() is not None:
+                    try:
+                        self.capture(notify=False)
+                        self.edge_sync.process_queue()
+                    except Exception as exc:
+                        self._sensor_status = "offline"
+                        print(f"[BoxTwin] Falha na medição automática: {exc}")
             now = datetime.now(timezone.utc)
             if not self._last_heartbeat_at or (now - self._last_heartbeat_at).total_seconds() >= self.config["HEARTBEAT_INTERVAL_SECONDS"]:
                 try:

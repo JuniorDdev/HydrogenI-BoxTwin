@@ -59,6 +59,7 @@ def load_config():
         "TWILIO_VALIDATE_SIGNATURE": _bool("TWILIO_VALIDATE_SIGNATURE", True),
         "EDGE_SYNC_ENABLED": _bool("EDGE_SYNC_ENABLED"),
         "LIVE_SENSOR_SYNC_ENABLED": _bool("LIVE_SENSOR_SYNC_ENABLED"),
+        "LIVE_MEASUREMENT_ENABLED": _bool("LIVE_MEASUREMENT_ENABLED"),
         "EDGE_SYNC_TARGET_URL": os.getenv("EDGE_SYNC_TARGET_URL", "").rstrip("/"),
         "EDGE_SYNC_TOKEN": os.getenv("EDGE_SYNC_TOKEN", ""),
         "EDGE_SYNC_TIMEOUT_SECONDS": int(os.getenv("EDGE_SYNC_TIMEOUT_SECONDS", "15")),
