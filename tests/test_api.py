@@ -220,3 +220,16 @@ def test_admin_analytics_reports_operational_metadata(tmp_path):
     assert pdf.mimetype == "application/pdf"
     assert spreadsheet.status_code == 200
     assert spreadsheet.mimetype == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def test_paginated_history_identifies_simulated_source(tmp_path):
+    app = create_app({"TESTING": True, "DATABASE_PATH": str(tmp_path / "page.db"), "CALIBRATION_PATH": str(tmp_path / "calibration.json"), "SENSOR_MODE": "mock"})
+    client = app.test_client()
+    client.post("/api/simulator/setup")
+    for _ in range(3):
+        client.post("/api/simulator/scenario/flat_50")
+    response = client.get("/api/readings/history/page?node_id=BOX-DEMO-01&page=1&page_size=2")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["total"] == 4 and data["pages"] == 2 and len(data["items"]) == 2
+    assert data["items"][0]["data_source"] == "simulated"

@@ -85,6 +85,7 @@ class BoxTwinRuntime:
             "node_id": self.config["BOX_NODE_ID"],
             "sensor_mode": self.config["SENSOR_MODE"],
             "scenario": getattr(self.sensor, "scenario", "physical"),
+            "data_source": "simulated" if self.config["SENSOR_MODE"] == "mock" else "physical",
             "reference_percent": reference_percent,
             "reference_error_points": reference_error,
             "distance_grid_mm": current,

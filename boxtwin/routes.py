@@ -315,12 +315,24 @@ def remote_box_commands(node_id):
 
 @bp.get("/api/readings/history")
 def history():
-    return jsonify(runtime().database.history(request.args.get("limit", 50), request.args.get("node_id", "").strip() or None))
+    node_id = request.args.get("node_id", "").strip() or None
+    if "page" in request.args:
+        return jsonify(runtime().database.history_page(request.args.get("page", 1), request.args.get("page_size", 20), node_id))
+    return jsonify(runtime().database.history(request.args.get("limit", 50), node_id))
 
+@bp.get("/api/readings/history/page")
+def history_page():
+    return jsonify(runtime().database.history_page(request.args.get("page", 1), request.args.get("page_size", 20), request.args.get("node_id", "").strip() or None))
 
 @bp.get("/api/boxes/<node_id>/anomalies")
 def box_anomalies(node_id):
+    if "page" in request.args:
+        return jsonify(runtime().database.anomalies_page(request.args.get("page", 1), request.args.get("page_size", 20), node_id, request.args.get("status")))
     return jsonify(runtime().database.anomalies_for_node(node_id, request.args.get("limit", 10)))
+
+@bp.get("/api/boxes/<node_id>/anomalies/page")
+def box_anomalies_page(node_id):
+    return jsonify(runtime().database.anomalies_page(request.args.get("page", 1), request.args.get("page_size", 20), node_id, request.args.get("status")))
 
 
 @bp.get("/api/alerts/active")
@@ -424,6 +436,8 @@ def rules():
 @bp.get("/api/admin/notifications")
 @admin_required
 def notifications():
+    if "page" in request.args:
+        return jsonify(runtime().database.notification_history_page(request.args.get("page", 1), request.args.get("page_size", 20)))
     return jsonify(runtime().database.notification_history(request.args.get("limit", 100)))
 
 
@@ -609,6 +623,7 @@ def edge_ingest_reading():
         "material_type": payload.get("material_type"), "material_name": payload.get("material_name"),
         "density_t_m3": payload.get("density_t_m3"), "expected_volume_m3": payload.get("expected_volume_m3"),
         "estimated_tons": payload.get("estimated_tons"), "reading_duration_ms": payload.get("reading_duration_ms"),
+        "data_source": payload.get("data_source", "physical"), "observed_volume_m3": payload.get("observed_volume_m3"),
     }
     reading_id, created_at, created = runtime().database.ingest_synced_reading(reading)
     runtime().database.heartbeat({"node_id": reading["node_id"], "last_reading_at": created_at, "sensor_status": "online", "api_status": "online"})
@@ -700,6 +715,7 @@ def service_worker():
     return current_app.send_static_file("service-worker.js")
 
 
+@bp.post("/api/simulator/level/<float:level>")
 @bp.post("/api/demo/level/<float:level>")
 def demo_level(level):
     sensor = runtime().sensor
@@ -709,6 +725,7 @@ def demo_level(level):
     return jsonify({"level_percent": sensor.level_percent})
 
 
+@bp.get("/api/simulator/scenarios")
 @bp.get("/api/demo/scenarios")
 def demo_scenarios():
     sensor = runtime().sensor
@@ -717,6 +734,7 @@ def demo_scenarios():
     return jsonify({"scenarios": sensor.list_scenarios(), "active": sensor.scenario})
 
 
+@bp.post("/api/simulator/scenario/<scenario>")
 @bp.post("/api/demo/scenario/<scenario>")
 def demo_scenario(scenario):
     sensor = runtime().sensor
@@ -732,6 +750,7 @@ def demo_scenario(scenario):
     return jsonify(result), 201
 
 
+@bp.post("/api/simulator/setup")
 @bp.post("/api/demo/setup")
 def demo_setup():
     sensor = runtime().sensor

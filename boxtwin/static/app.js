@@ -358,7 +358,7 @@ async function chooseScenario(id) {
   const buttons = document.querySelectorAll('.scenario');
   buttons.forEach(item => item.disabled = true);
   try {
-    render(await request(`/api/demo/scenario/${id}`, {method:'POST'}));
+    render(await request(`/api/simulator/scenario/${id}`, {method:'POST'}));
     await Promise.all([loadHistory(), loadActiveAlerts()]);
   } catch (error) {
     showToast(error.message, 'error');
@@ -372,7 +372,7 @@ async function loadScenarios() {
     $('demoPanel').hidden = true;
     return;
   }
-  const data = await request('/api/demo/scenarios');
+  const data = await request('/api/simulator/scenarios');
   $('scenarios').innerHTML = '';
   data.scenarios.forEach(item => {
     const button = document.createElement('button');
@@ -401,7 +401,7 @@ async function initialize() {
     await loadScenarios();
     const latest = await request('/api/readings/latest');
     if (latest.status === 'no_data' && state.health.demo_enabled) {
-      const setup = await request('/api/demo/setup',{method:'POST'});
+      const setup = await request('/api/simulator/setup',{method:'POST'});
       render(setup.reading);
     } else {
       render(latest);
@@ -432,14 +432,14 @@ async function initialize() {
 }
 
 $('setup').onclick = async () => {
-  const data=await request('/api/demo/setup',{method:'POST'});
+  const data=await request('/api/simulator/setup',{method:'POST'});
   render(data.reading);
   await Promise.all([loadHistory(), loadActiveAlerts()]);
 };
 
 $('stopDemo').onclick = async () => {
   try {
-    const data = await request('/api/demo/scenario/empty', {method:'POST'});
+    const data = await request('/api/simulator/scenario/empty', {method:'POST'});
     render(data);
     state.activeAlerts.forEach(item => markAlertSeen(item.id));
     $('interventionModal').hidden = true;
@@ -465,7 +465,7 @@ $('capture').onclick = async () => {
 
 async function performCalibration() {
   try {
-    if (state.health.demo_enabled) render(await request('/api/demo/scenario/empty',{method:'POST'}));
+    if (state.health.demo_enabled) render(await request('/api/simulator/scenario/empty',{method:'POST'}));
     else {
       await request('/api/calibration',{method:'POST'});
       showToast('Calibração salva.','success');
@@ -479,6 +479,14 @@ async function performCalibration() {
 $('calibrate').onclick = () => {
   showConfirmToast('A calibração definirá o box como vazio. Deseja continuar?', performCalibration, {confirmLabel:'Calibrar', cancelLabel:'Cancelar'});
 };
+
+const simulatorCanvas=$('twinCanvas');let simulatorDrag=null;
+simulatorCanvas.style.touchAction='none';
+simulatorCanvas.addEventListener('pointerdown',event=>{simulatorCanvas.setPointerCapture(event.pointerId);simulatorDrag={x:event.clientX,y:event.clientY};});
+simulatorCanvas.addEventListener('pointermove',event=>{if(!simulatorDrag)return;viewState.rotationY+=(event.clientX-simulatorDrag.x)*.012;viewState.rotationX=Math.max(-1.28,Math.min(1.28,viewState.rotationX-(event.clientY-simulatorDrag.y)*.009));simulatorDrag={x:event.clientX,y:event.clientY};if(state.latest)drawTwin(state.latest.height_grid_m);});
+simulatorCanvas.addEventListener('pointerup',()=>simulatorDrag=null);simulatorCanvas.addEventListener('pointercancel',()=>simulatorDrag=null);
+simulatorCanvas.addEventListener('wheel',event=>{event.preventDefault();viewState.zoom=Math.max(.5,Math.min(2.8,viewState.zoom+(event.deltaY<0?.14:-.14)));if(state.latest)drawTwin(state.latest.height_grid_m);},{passive:false});
+simulatorCanvas.addEventListener('dblclick',()=>{viewState.rotationY=Math.PI/4;viewState.rotationX=.48;viewState.zoom=1;if(state.latest)drawTwin(state.latest.height_grid_m);});
 
 window.addEventListener('resize', () => {
   if (state.latest) drawTwin(state.latest.height_grid_m);

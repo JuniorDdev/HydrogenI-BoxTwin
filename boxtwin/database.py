@@ -52,6 +52,8 @@ class Database:
                 "expected_volume_m3": "REAL",
                 "estimated_tons": "REAL",
                 "reading_duration_ms": "INTEGER",
+                "data_source": "TEXT",
+                "observed_volume_m3": "REAL",
             }
             for column, column_type in migrations.items():
                 if column not in existing:
@@ -353,8 +355,8 @@ class Database:
                     , scenario, reference_percent, reference_error_points,
                     average_height_m, maximum_height_m, capacity_m3, box_id, sensor_id,
                     material_type, material_name, density_t_m3, expected_volume_m3,
-                    estimated_tons, reading_duration_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    estimated_tons, reading_duration_ms, data_source, observed_volume_m3
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 reading["reading_uuid"], created_at, reading["node_id"], reading["volume_m3"], reading["capacity_percent"],
                 reading["confidence_percent"], reading["valid_zones"], reading["status"],
@@ -366,6 +368,7 @@ class Database:
                 reading.get("material_type") or "nao_informado", reading.get("material_name") or "Não informado",
                 reading.get("density_t_m3"), reading.get("expected_volume_m3"),
                 reading.get("estimated_tons"), reading.get("reading_duration_ms"),
+                reading.get("data_source") or "physical", reading.get("observed_volume_m3"),
             ))
             return cursor.lastrowid, created_at
 
@@ -470,6 +473,24 @@ class Database:
         with self.connect() as connection:
             rows = connection.execute("SELECT * FROM readings WHERE node_id=? ORDER BY id DESC LIMIT ?", (node_id, limit)).fetchall() if node_id else connection.execute("SELECT * FROM readings ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return [self._serialize(row) for row in reversed(rows)]
+
+    def history_page(self, page=1, page_size=20, node_id=None):
+        page, page_size = max(1, int(page)), max(1, min(int(page_size), 100))
+        where, params = (" WHERE node_id=?", [node_id]) if node_id else ("", [])
+        with self.connect() as connection:
+            total = connection.execute(f"SELECT COUNT(*) FROM readings{where}", params).fetchone()[0]
+            rows = connection.execute(f"SELECT * FROM readings{where} ORDER BY id DESC LIMIT ? OFFSET ?", [*params, page_size, (page - 1) * page_size]).fetchall()
+        return {"items": [self._serialize(row) for row in rows], "page": page, "page_size": page_size, "total": total, "pages": max(1, (total + page_size - 1) // page_size)}
+
+    def anomalies_page(self, page=1, page_size=20, node_id=None, status=None):
+        page, page_size = max(1, int(page)), max(1, min(int(page_size), 100)); clauses, params, join = [], [], ""
+        if node_id: join = " JOIN readings ON readings.id=anomalies.reading_id"; clauses.append("readings.node_id=?"); params.append(node_id)
+        if status: clauses.append("anomalies.status=?"); params.append(status)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        with self.connect() as connection:
+            total = connection.execute(f"SELECT COUNT(*) FROM anomalies{join}{where}", params).fetchone()[0]
+            rows = connection.execute(f"SELECT anomalies.* FROM anomalies{join}{where} ORDER BY anomalies.id DESC LIMIT ? OFFSET ?", [*params, page_size, (page-1)*page_size]).fetchall()
+        return {"items": [dict(row) for row in rows], "page": page, "page_size": page_size, "total": total, "pages": max(1, (total + page_size - 1) // page_size)}
 
     def analytics(self, filters=None):
         """Return manager KPIs while keeping legacy readings usable."""
@@ -685,6 +706,13 @@ class Database:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def notification_history_page(self, page=1, page_size=20):
+        page, page_size = max(1, int(page)), max(1, min(int(page_size), 100))
+        with self.connect() as connection:
+            total = connection.execute("SELECT COUNT(*) FROM notification_log").fetchone()[0]
+            rows = connection.execute("SELECT * FROM notification_log ORDER BY id DESC LIMIT ? OFFSET ?", (page_size, (page - 1) * page_size)).fetchall()
+        return {"items": [dict(row) for row in rows], "page": page, "page_size": page_size, "total": total, "pages": max(1, (total + page_size - 1) // page_size)}
+
     def active_alerts(self, limit=10):
         with self.connect() as connection:
             rows = connection.execute(
@@ -813,4 +841,5 @@ class Database:
             "material_type": row["material_type"] or "nao_informado", "material_name": row["material_name"] or "Não informado",
             "density_t_m3": row["density_t_m3"], "expected_volume_m3": row["expected_volume_m3"],
             "estimated_tons": row["estimated_tons"], "reading_duration_ms": row["reading_duration_ms"],
+            "data_source": row["data_source"] or "physical", "observed_volume_m3": row["observed_volume_m3"],
         }

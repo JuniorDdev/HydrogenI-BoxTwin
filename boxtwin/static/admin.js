@@ -1,4 +1,5 @@
 const $ = id => document.getElementById(id);
+let notificationPage = 1;
 const escapeHtml = text => String(text ?? '').replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
 const statusLabels = {open:'Aberta', acknowledged:'Ciente', in_progress:'Em atendimento', resolved:'Resolvida', false_positive:'Falso positivo'};
 const typeLabels = {capacity:'Capacidade', confidence:'Baixa confiança', obstruction:'Obstrução'};
@@ -168,7 +169,7 @@ async function loadAdmin() {
     const [summary, anomalies, notifications, recipients, rules, activeAlerts] = await Promise.all([
       api('/api/admin/summary'),
       api('/api/admin/anomalies?limit=50&status=active'),
-      api('/api/admin/notifications?limit=30'),
+      api(`/api/admin/notifications?page=${notificationPage}&page_size=12`),
       api('/api/admin/recipients'),
       api('/api/admin/rules'),
       api('/api/alerts/active?limit=10'),
@@ -178,7 +179,7 @@ async function loadAdmin() {
     renderSummary(summary);
     renderAnomalies(enrichedAnomalies);
     renderActiveAlertSignal(activeAlerts.items);
-    $('notificationList').innerHTML = notifications.length ? notifications.map(item => {
+    $('notificationList').innerHTML = notifications.items.length ? notifications.items.map(item => {
       const state = item.delivery_status || item.status;
       const stateLabel = state === 'sent' ? 'Enviado' : state === 'failed' ? 'Falhou' : state;
       return `<div class="notification-row ${state === 'failed' ? 'notification-failed' : ''}">
@@ -188,6 +189,7 @@ async function loadAdmin() {
         <em>${escapeHtml(item.detail || 'O provedor não informou detalhes.')}</em>
       </div>`;
     }).join('') : '<p class="muted">Nenhuma notificação enviada. Os canais externos permanecem opcionais.</p>';
+    const notificationPager=$('notificationPager'); notificationPager.replaceChildren(); if(notifications.pages>1){ for(const [text,delta] of [['←',-1],['→',1]]){const button=Object.assign(document.createElement('button'),{textContent:text,disabled:delta<0?notifications.page<=1:notifications.page>=notifications.pages});button.onclick=()=>{notificationPage+=delta;loadAdmin()};notificationPager.append(button)} const label=document.createElement('span');label.textContent=`${notifications.page}/${notifications.pages}`;notificationPager.insertBefore(label,notificationPager.children[1]); }
     $('recipientList').innerHTML = recipients.map(item => `<div class="list-row"><b>${escapeHtml(item.name)}</b><span>${escapeHtml(item.team_name || item.recipient_type)}</span><small>${escapeHtml(item.email || item.phone)}</small></div>`).join('') || '<p class="muted">Cadastre o primeiro responsável.</p>';
     const activeRecipients = recipients.filter(item => item.active);
     $('ruleRecipient').innerHTML = activeRecipients.map(item => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');

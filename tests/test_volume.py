@@ -24,3 +24,15 @@ def test_invalid_grid_shape():
     service = VolumeService(length_m=0.40, width_m=0.40, height_m=0.40)
     with pytest.raises(ValueError):
         service.calculate([[500]], [[250]])
+
+
+def test_partial_sensor_grid_projects_valid_mean_without_zero_fill():
+    service = VolumeService(length_m=0.40, width_m=0.40, height_m=0.40)
+    current = grid(200)
+    current[0][0] = None
+    result = service.calculate(grid(400), current)
+    assert result["valid_zones"] == 63
+    assert result["confidence_percent"] == pytest.approx(98.4)
+    assert result["average_height_m"] == pytest.approx(0.2)
+    assert result["volume_m3"] == pytest.approx(0.032)
+    assert result["height_grid_m"][0][0] is None

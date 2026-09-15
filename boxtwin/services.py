@@ -30,28 +30,25 @@ class VolumeService:
         self.cell_area_m2 = (length_m * width_m) / 64
 
     def calculate(self, empty_grid_mm, current_grid_mm):
-        empty = np.array(empty_grid_mm, dtype=float)
-        current = np.array([[np.nan if value is None else value for value in row] for row in current_grid_mm])
+        """Estimate volume from paired valid zones; absent zones are never zero-fill."""
+        empty = np.array([[np.nan if value is None else value for value in row] for row in empty_grid_mm], dtype=float)
+        current = np.array([[np.nan if value is None else value for value in row] for row in current_grid_mm], dtype=float)
         if empty.shape != (8, 8) or current.shape != (8, 8):
             raise ValueError("A leitura deve conter uma matriz 8x8.")
-        heights = np.clip((empty - current) / 1000, 0, self.height_m)
-        valid = np.isfinite(heights)
-        valid_zones = int(valid.sum())
-        volume_m3 = float(np.nansum(heights) * self.cell_area_m2)
+        paired = np.isfinite(empty) & np.isfinite(current)
+        heights = np.where(paired, np.clip((empty - current) / 1000, 0, self.height_m), np.nan)
+        valid_zones = int(paired.sum())
+        mean_height_m = float(np.nanmean(heights)) if valid_zones else 0.0
+        observed_volume_m3 = float(np.nansum(heights) * self.cell_area_m2)
+        volume_m3 = mean_height_m * self.length_m * self.width_m
         capacity_percent = (volume_m3 / self.capacity_m3 * 100) if self.capacity_m3 else 0
-        coverage = valid_zones / 64
-        confidence_percent = round(coverage * 100, 1)
-        safe_heights = np.where(valid, heights, 0).round(4).tolist()
-        return {
-            "volume_m3": round(volume_m3, 5),
-            "capacity_m3": round(self.capacity_m3, 5),
-            "capacity_percent": round(capacity_percent, 1),
-            "average_height_m": round(float(np.nanmean(heights)) if valid_zones else 0, 4),
-            "maximum_height_m": round(float(np.nanmax(heights)) if valid_zones else 0, 4),
-            "confidence_percent": confidence_percent,
-            "valid_zones": valid_zones,
-            "height_grid_m": safe_heights,
-        }
+        safe_heights = [[round(float(value), 4) if np.isfinite(value) else None for value in row] for row in heights]
+        return {"volume_m3": round(volume_m3, 5), "observed_volume_m3": round(observed_volume_m3, 5),
+                "capacity_m3": round(self.capacity_m3, 5), "capacity_percent": round(capacity_percent, 1),
+                "average_height_m": round(mean_height_m, 4),
+                "maximum_height_m": round(float(np.nanmax(heights)) if valid_zones else 0, 4),
+                "confidence_percent": round(valid_zones / 64 * 100, 1), "valid_zones": valid_zones,
+                "height_grid_m": safe_heights}
 
 
 class AlertService:
