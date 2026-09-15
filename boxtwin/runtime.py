@@ -53,13 +53,13 @@ class BoxTwinRuntime:
             payload["sync_error"] = str(exc)[:200]
         return payload
 
-    def capture(self, metadata=None, notify=True):
+    def capture(self, metadata=None, notify=True, distance_grid_mm=None):
         metadata = metadata or {}
         started_at = datetime.now(timezone.utc)
         empty = self.calibration.load()
         if empty is None:
             return {"status": "not_calibrated", "message": "Calibre o box vazio antes de medir."}
-        current = self.sensor.read_distance_grid_mm()
+        current = distance_grid_mm if distance_grid_mm is not None else self.sensor.read_distance_grid_mm()
         self._sensor_status = "online"
         metrics = self.volume.calculate(empty, current)
         reference_percent = getattr(self.sensor, "reference_percent", None)
@@ -177,13 +177,14 @@ class BoxTwinRuntime:
                             print(f"[BoxTwin] Comando remoto falhou: {exc}")
                 except Exception as exc:
                     print(f"[BoxTwin] Falha ao consultar comandos remotos: {exc}")
-            if self.config.get("LIVE_SENSOR_SYNC_ENABLED") and self.config["SENSOR_MODE"] == "vl53l8cx":
+            automatic_measurement = self.config.get("LIVE_MEASUREMENT_ENABLED") and self.config["SENSOR_MODE"] == "vl53l8cx"
+            if self.config.get("LIVE_SENSOR_SYNC_ENABLED") and not automatic_measurement and self.config["SENSOR_MODE"] == "vl53l8cx":
                 try:
                     self.read_raw_sensor_grid()
                 except Exception as exc:
                     self._sensor_status = "offline"
                     print(f"[BoxTwin] Falha na leitura bruta ao vivo: {exc}")
-            if self.config.get("LIVE_MEASUREMENT_ENABLED") and self.config["SENSOR_MODE"] == "vl53l8cx":
+            if automatic_measurement:
                 if self.calibration.load() is not None:
                     try:
                         self.capture(notify=False)
