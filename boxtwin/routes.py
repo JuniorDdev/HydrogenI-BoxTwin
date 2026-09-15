@@ -295,6 +295,11 @@ def box_status(node_id):
     return jsonify(runtime().database.node_status(node_id, current_app.config["NODE_OFFLINE_AFTER_SECONDS"]) or {"status": "no_data", "node_id": node_id})
 
 
+@bp.get("/api/boxes")
+def boxes():
+    return jsonify(runtime().database.list_nodes(current_app.config["NODE_OFFLINE_AFTER_SECONDS"]))
+
+
 @bp.route("/api/admin/boxes/<node_id>/commands", methods=["GET", "POST"])
 @admin_required
 def remote_box_commands(node_id):
@@ -310,7 +315,12 @@ def remote_box_commands(node_id):
 
 @bp.get("/api/readings/history")
 def history():
-    return jsonify(runtime().database.history(request.args.get("limit", 50)))
+    return jsonify(runtime().database.history(request.args.get("limit", 50), request.args.get("node_id", "").strip() or None))
+
+
+@bp.get("/api/boxes/<node_id>/anomalies")
+def box_anomalies(node_id):
+    return jsonify(runtime().database.anomalies_for_node(node_id, request.args.get("limit", 10)))
 
 
 @bp.get("/api/alerts/active")

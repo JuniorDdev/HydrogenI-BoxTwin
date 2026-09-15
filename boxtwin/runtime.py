@@ -201,6 +201,10 @@ class BoxTwinRuntime:
                         "sensor_mode": self.config["SENSOR_MODE"],
                         "sensor_status": self._sensor_status,
                         "last_reading_at": latest.get("created_at") if latest else None,
+                        "box_name": self.config["BOX_NAME"],
+                        "box_length_m": self.config["BOX_LENGTH_M"],
+                        "box_width_m": self.config["BOX_WIDTH_M"],
+                        "box_height_m": self.config["BOX_HEIGHT_M"],
                     })
                     self._last_heartbeat_at = now
                 except Exception as exc:

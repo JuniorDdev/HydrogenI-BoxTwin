@@ -298,6 +298,11 @@ class Database:
             row = connection.execute("SELECT * FROM readings WHERE node_id=? ORDER BY id DESC LIMIT 1", (node_id,)).fetchone()
         return self._serialize(row) if row else None
 
+    def list_nodes(self, offline_after_seconds=120):
+        with self.connect() as connection:
+            rows = connection.execute("SELECT node_id FROM box_nodes UNION SELECT DISTINCT node_id FROM readings ORDER BY node_id").fetchall()
+        return [self.node_status(row["node_id"], offline_after_seconds) for row in rows]
+
     def upsert_live_sensor_grid(self, payload):
         """Keep the most recent uncalibrated 8x8 frame for each BoxNode."""
         received_at = datetime.now(timezone.utc).isoformat()
@@ -460,10 +465,10 @@ class Database:
             row = connection.execute("SELECT * FROM readings ORDER BY id DESC LIMIT 1").fetchone()
         return self._serialize(row) if row else None
 
-    def history(self, limit=50):
+    def history(self, limit=50, node_id=None):
         limit = max(1, min(int(limit), 500))
         with self.connect() as connection:
-            rows = connection.execute("SELECT * FROM readings ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+            rows = connection.execute("SELECT * FROM readings WHERE node_id=? ORDER BY id DESC LIMIT ?", (node_id, limit)).fetchall() if node_id else connection.execute("SELECT * FROM readings ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return [self._serialize(row) for row in reversed(rows)]
 
     def analytics(self, filters=None):
@@ -555,6 +560,12 @@ class Database:
         params.append(max(1, min(int(limit), 500)))
         with self.connect() as connection:
             return [dict(row) for row in connection.execute(query, params).fetchall()]
+
+    def anomalies_for_node(self, node_id, limit=10):
+        with self.connect() as connection:
+            rows = connection.execute("""SELECT anomalies.* FROM anomalies JOIN readings ON readings.id=anomalies.reading_id
+                WHERE readings.node_id=? ORDER BY anomalies.id DESC LIMIT ?""", (node_id, max(1, min(int(limit), 100)))).fetchall()
+        return [dict(row) for row in rows]
 
     def update_anomaly_status(self, anomaly_id, status, note="", actor="Administrador"):
         allowed = {"open", "acknowledged", "in_progress", "resolved", "false_positive"}
