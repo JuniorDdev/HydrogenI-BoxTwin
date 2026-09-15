@@ -11,7 +11,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/"><img class="brand-logo" src="{{ url_for('static', filename='img/hydrogeni-lab-logo.png') }}" alt="HydrogenI"><div><span>HYDROGENI · BOXNODE</span><h1>BoxTwin 3D</h1><p>{{ box_name }} · {{ node_id }}</p></div></a>
-    <div class="status-group"><a href="/" class="badge">PROJETO</a><a href="/admin" class="badge">ÁREA ADMIN</a><b id="modeBadge" class="badge demo">MODO DEMONSTRAÇÃO</b><b id="connection" class="badge">Conectando…</b></div>
+    <div class="status-group"><a href="/" class="badge">PROJETO</a><a href="/box/BOX-01" class="badge">MONITORAMENTO REAL</a><a href="/admin" class="badge">ÁREA ADMIN</a><b id="modeBadge" class="badge demo">MODO DEMONSTRAÇÃO</b><b id="connection" class="badge">Conectando…</b></div>
   </header>
   <main>
     <section class="hero"><div><span class="eyebrow">AMBIENTE SIMULADO</span><h2>Volume do box em tempo real</h2><p>Protótipo demonstrável com matriz virtual 8 x 8. A mesma interface receberá as leituras do sensor físico quando o hardware estiver disponível.</p></div><div class="box-spec"><span>Capacidade cadastrada</span><strong id="boxCapacity">-</strong><small id="boxDimensions">Carregando dimensões...</small></div></section>
