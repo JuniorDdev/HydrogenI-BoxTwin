@@ -191,3 +191,6 @@ body.landing-page{background:#101314;color:#f4f8fb}
 .mobile-list-item b{color:#fff}
 @media(max-width:560px){.mobile-hero{grid-template-columns:1fr}.mobile-actions,.mobile-metrics{grid-template-columns:1fr 1fr}.mobile-card-heading{align-items:flex-start;flex-direction:column}.mobile-logo{width:112px;height:112px}.mobile-reading-row{align-items:flex-start;flex-direction:column}}
 @media(max-width:380px){.mobile-metrics{grid-template-columns:1fr}}
+
+/* Interações do gêmeo físico: mantêm a paleta HydrogenI e funcionam com mouse e toque. */
+.twin-panel canvas{cursor:grab;touch-action:none}.twin-panel canvas:active{cursor:grabbing}.twin-help{margin:12px 0 7px;text-align:center;color:#4c6982;font-size:12px;font-weight:650}.twin-controls{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.twin-controls button{margin:0;border:1px solid #c7d9ea;background:#f7fbff;color:#16466d}@media(max-width:720px){.twin-controls{grid-template-columns:repeat(2,1fr)}}
