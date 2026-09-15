@@ -39,7 +39,7 @@ function drawChart(items) {
 
   const values = items.map(item => Number(item.volume_m3 || 0));
   if (!values.length) {
-    context.fillStyle = '#63716c';
+    context.fillStyle = '#8da5ba';
     context.font = '14px Arial';
     context.fillText('Sem leituras para exibir.', 24, 42);
     return;
@@ -50,7 +50,7 @@ function drawChart(items) {
   const max = Math.max(...values) + 0.02;
   const width = rect.width - pad * 2;
   const height = rect.height - pad * 2;
-  context.strokeStyle = 'rgba(130,143,163,.18)';
+  context.strokeStyle = 'rgba(141,165,186,.22)';
   context.lineWidth = 1;
   for (let index = 0; index < 5; index += 1) {
     const y = pad + (height / 4) * index;
@@ -65,8 +65,8 @@ function drawChart(items) {
     y: pad + height - ((value - min) / (max - min || 1)) * height,
   }));
   const gradient = context.createLinearGradient(0, pad, 0, rect.height - pad);
-  gradient.addColorStop(0, 'rgba(21,183,158,.32)');
-  gradient.addColorStop(1, 'rgba(21,183,158,0)');
+  gradient.addColorStop(0, 'rgba(24,212,255,.34)');
+  gradient.addColorStop(1, 'rgba(24,212,255,0)');
   context.beginPath();
   points.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y));
   context.lineTo(points[points.length - 1].x, rect.height - pad);
@@ -76,7 +76,7 @@ function drawChart(items) {
   context.fill();
   context.beginPath();
   points.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y));
-  context.strokeStyle = '#15b79e';
+  context.strokeStyle = '#18d4ff';
   context.lineWidth = 3;
   context.lineJoin = 'round';
   context.lineCap = 'round';
@@ -84,9 +84,9 @@ function drawChart(items) {
   points.forEach((point, index) => {
     context.beginPath();
     context.arc(point.x, point.y, index === points.length - 1 ? 5 : 3.5, 0, Math.PI * 2);
-    context.fillStyle = index === points.length - 1 ? '#fff' : '#15b79e';
+    context.fillStyle = index === points.length - 1 ? '#f4f8fb' : '#18d4ff';
     context.fill();
-    context.strokeStyle = '#15b79e';
+    context.strokeStyle = '#18d4ff';
     context.lineWidth = 2;
     context.stroke();
   });
