@@ -1,27 +1,4 @@
 <!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#071526">
-  <title>Gêmeo do Sensor | HydrogenI BoxTwin</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <style>
-    .live-shell{width:min(1120px,calc(100% - 36px));margin:0 auto;padding:34px 0 70px}.live-intro{display:flex;justify-content:space-between;gap:24px;align-items:end;margin-bottom:22px}.live-intro h2{margin:8px 0;font-size:clamp(30px,5vw,48px)}.live-intro p{max-width:680px;margin:0;color:var(--muted);line-height:1.6}.live-layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(285px,.6fr);gap:18px}.live-card{padding:20px;border:1px solid var(--line);border-radius:18px;background:var(--card);box-shadow:0 14px 35px #07152612}.live-card h3{margin:7px 0 4px}.live-card p{margin:0;color:var(--muted);font-size:13px;line-height:1.55}.live-canvas{display:block;width:100%;aspect-ratio:1.4;margin-top:16px;border-radius:14px;background:#061525}.live-meta{display:grid;gap:11px;margin-top:18px}.live-meta div{padding:13px;border-radius:12px;background:#eef6fc}.live-meta small,.live-meta b{display:block}.live-meta small{color:var(--muted);font-size:11px}.live-meta b{margin-top:4px;color:var(--ink)}.live-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-top:16px}.live-zone{display:grid;place-items:center;aspect-ratio:1;border-radius:7px;background:#e8f0f7;color:#36526b;font-size:10px;font-weight:800}.live-zone.near{background:#1769ff;color:#fff}.live-zone.mid{background:#18a8d8;color:#fff}.live-zone.far{background:#8bd7e8;color:#133a51}.live-zone.none{background:#edf1f4;color:#94a3b0}.live-notice{margin-top:18px;padding:13px;border-left:4px solid var(--cyan);border-radius:8px;background:#edf8fc;color:#315a70;font-size:12px;line-height:1.55}.live-notice.waiting{border-color:var(--amber);background:#fff8e8;color:#795714}@media(max-width:800px){.live-intro{align-items:start;flex-direction:column}.live-layout{grid-template-columns:1fr}}
-  </style>
-</head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="/"><img class="brand-logo" src="{{ url_for('static', filename='img/hydrogeni-lab-logo.png') }}" alt="HydrogenI"><div><span>HYDROGENI · BOXNODE</span><h1>BoxTwin 3D</h1><p>{{ box_name }} · {{ node_id }}</p></div></a>
-    <div class="status-group"><a href="/" class="badge">PROJETO</a><a href="/simulador" class="badge">SIMULADOR</a><b id="liveStatus" class="badge">Aguardando sensor</b></div>
-  </header>
-  <main class="live-shell">
-    <section class="live-intro"><div><span class="eyebrow">DIAGNÓSTICO REMOTO</span><h2>Gêmeo 3D do sensor</h2><p>Visualização da última matriz 8 × 8 enviada pelo Raspberry. A altura representa proximidade relativa: zonas mais altas estão mais próximas do VL53L8CX.</p></div></section>
-    <section class="live-layout">
-      <article class="live-card"><span class="eyebrow">SUPERFÍCIE DE DISTÂNCIA</span><h3>Leitura ao vivo sem calibração</h3><p>Este painel não calcula volume nem ocupação do box.</p><canvas id="twinCanvas" class="live-canvas" aria-label="Gêmeo 3D da matriz de distâncias"></canvas><div id="liveNotice" class="live-notice waiting">Aguardando a primeira grade sincronizada pelo Raspberry.</div></article>
-      <aside class="live-card"><span class="eyebrow">MATRIZ 8 × 8</span><h3 id="nodeLabel">Sem dados</h3><div id="liveGrid" class="live-grid" aria-live="polite"></div><div class="live-meta"><div><small>Última captura no Raspberry</small><b id="capturedAt">—</b></div><div><small>Zonas válidas</small><b id="validZones">—</b></div><div><small>Atualização desta página</small><b id="refreshedAt">—</b></div></div></aside>
-    </section>
-  </main>
-  <script src="{{ url_for('static', filename='live-twin.js') }}"></script>
-</body>
-</html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#071526"><title>Medição real | BoxTwin</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><header class="topbar"><a class="brand" href="/"><img class="brand-logo" src="{{ url_for('static', filename='img/hydrogeni-lab-logo.png') }}" alt="HydrogenI"><div><span>HYDROGENI · MEDIÇÃO REAL</span><h1>Gêmeo digital do box</h1><p>{{ box_name }} · <b id="nodeLabel">{{ node_id }}</b></p></div></a><div class="status-group"><b id="liveStatus" class="badge">Aguardando leitura</b></div></header>
+<main><section class="workspace"><article class="panel twin-panel"><div class="panel-heading"><div><span class="eyebrow">VISTA TRIDIMENSIONAL</span><h3>Gêmeo digital do box</h3></div><span id="updated" class="muted">Sem leitura</span></div><canvas id="twinCanvas" aria-label="Representação tridimensional da carga. Arraste para girar."></canvas><p class="muted">Arraste sobre o gêmeo para girar a visualização.</p><div class="legend"><span>Baixo</span><i></i><span>Alto</span></div></article><article class="panel map-panel"><div class="panel-heading"><div><span class="eyebrow">MAPA DE ALTURA</span><h3>Superfície 8 x 8</h3></div><span class="unit">cm</span></div><div id="grid" class="grid" aria-live="polite"></div></article><aside class="panel control-panel"><div><span class="eyebrow">MEDIÇÃO FÍSICA</span><h3 id="readingStatus">Aguardando leitura</h3></div><div class="alerts"><p>Volume: <b id="volume">—</b> m³</p><p>Ocupação: <b id="capacity">—</b>%</p><p>Confiança: <b id="confidence">—</b>%</p><p>Zonas válidas: <b id="zones">—</b></p></div></aside></section></main><script src="{{ url_for('static', filename='live-twin.js') }}"></script></body></html>

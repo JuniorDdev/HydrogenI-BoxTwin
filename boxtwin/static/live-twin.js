@@ -1,75 +1,9 @@
-const canvas = document.getElementById('twinCanvas');
-const context = canvas.getContext('2d');
-const gridElement = document.getElementById('liveGrid');
-const statusElement = document.getElementById('liveStatus');
-const noticeElement = document.getElementById('liveNotice');
-
-function formatDate(value) {
-  return value ? new Date(value).toLocaleString('pt-BR') : '—';
-}
-
-function values(grid) { return grid.flat().filter(Number.isFinite); }
-
-function colorFor(value, min, max) {
-  if (!Number.isFinite(value)) return '#edf1f4';
-  const normalized = max === min ? .5 : (value - min) / (max - min);
-  const hue = 12 + normalized * 198;
-  return `hsl(${hue} 78% ${42 + normalized * 18}%)`;
-}
-
-function renderGrid(grid) {
-  const flat = values(grid); const min = Math.min(...flat); const max = Math.max(...flat);
-  gridElement.replaceChildren(...grid.flat().map(value => {
-    const cell = document.createElement('div');
-    const relative = !Number.isFinite(value) ? 'none' : value < min + (max-min)/3 ? 'near' : value < min + (max-min)*2/3 ? 'mid' : 'far';
-    cell.className = `live-zone ${relative}`;
-    cell.textContent = Number.isFinite(value) ? `${Math.round(value)}` : '—';
-    cell.title = Number.isFinite(value) ? `${value} mm` : 'sem leitura';
-    return cell;
-  }));
-}
-
-function drawTwin(grid) {
-  const width = canvas.clientWidth; const height = canvas.clientHeight;
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = width * dpr; canvas.height = height * dpr;
-  context.setTransform(dpr, 0, 0, dpr, 0, 0);
-  context.clearRect(0, 0, width, height);
-  const flat = values(grid); if (!flat.length) return;
-  const min = Math.min(...flat), max = Math.max(...flat);
-  const origin = { x: width / 2, y: height * .17 };
-  const sx = Math.min(width * .055, 42), sy = sx * .48, sz = Math.min(height * .5, 230);
-  const project = (x, y, z) => ({ x: origin.x + (x-y)*sx, y: origin.y + (x+y)*sy - z });
-  context.strokeStyle = '#70d8ff45'; context.lineWidth = 1;
-  for (let r = 0; r <= 8; r++) { const a=project(0,r,0), b=project(8,r,0); context.beginPath();context.moveTo(a.x,a.y);context.lineTo(b.x,b.y);context.stroke(); }
-  for (let c = 0; c <= 8; c++) { const a=project(c,0,0), b=project(c,8,0); context.beginPath();context.moveTo(a.x,a.y);context.lineTo(b.x,b.y);context.stroke(); }
-  for (let r = 7; r >= 0; r--) for (let c = 0; c < 8; c++) {
-    const value = grid[r][c]; if (!Number.isFinite(value)) continue;
-    const closeness = max === min ? .5 : (max-value)/(max-min);
-    const z = 12 + closeness * sz;
-    const p1=project(c,r,0), p2=project(c+1,r,0), p3=project(c+1,r+1,0), p4=project(c,r+1,0);
-    const t1=project(c,r,z), t2=project(c+1,r,z), t3=project(c+1,r+1,z), t4=project(c,r+1,z);
-    context.fillStyle = colorFor(value,min,max); context.beginPath();context.moveTo(t1.x,t1.y);context.lineTo(t2.x,t2.y);context.lineTo(t3.x,t3.y);context.lineTo(t4.x,t4.y);context.closePath();context.fill();
-    context.fillStyle = 'rgba(5,18,35,.38)'; context.beginPath();context.moveTo(t3.x,t3.y);context.lineTo(p3.x,p3.y);context.lineTo(p4.x,p4.y);context.lineTo(t4.x,t4.y);context.closePath();context.fill();
-    context.fillStyle = 'rgba(255,255,255,.18)'; context.beginPath();context.moveTo(t2.x,t2.y);context.lineTo(p2.x,p2.y);context.lineTo(p3.x,p3.y);context.lineTo(t3.x,t3.y);context.closePath();context.fill();
-  }
-}
-
-async function refresh() {
-  try {
-    const nodeId = new URLSearchParams(location.search).get('node_id');
-    const response = await fetch(`/api/live-grid${nodeId ? `?node_id=${encodeURIComponent(nodeId)}` : ''}`, { cache: 'no-store' });
-    const data = await response.json();
-    document.getElementById('refreshedAt').textContent = new Date().toLocaleTimeString('pt-BR');
-    if (data.status === 'no_data') {
-      statusElement.textContent = 'Aguardando sensor'; return;
-    }
-    renderGrid(data.distance_grid_mm); drawTwin(data.distance_grid_mm);
-    document.getElementById('nodeLabel').textContent = data.node_id;
-    document.getElementById('capturedAt').textContent = formatDate(data.captured_at);
-    document.getElementById('validZones').textContent = `${data.valid_zones} de 64`;
-    statusElement.textContent = 'Sensor sincronizado'; statusElement.classList.add('demo');
-    noticeElement.className = 'live-notice'; noticeElement.textContent = 'Leitura bruta recebida. A geometria é relativa à distância, sem calibração de box ou cálculo de volume.';
-  } catch (error) { statusElement.textContent = 'Falha ao atualizar'; }
-}
-window.addEventListener('resize', refresh); refresh(); setInterval(refresh, 10000);
+const $=id=>document.getElementById(id),canvas=$('twinCanvas'),view={yaw:.8,pitch:.48,drag:false,x:0};let lastGrid=null;
+const fmt=(value,digits=1)=>Number(value||0).toLocaleString('pt-BR',{minimumFractionDigits:digits,maximumFractionDigits:digits});
+function color(value,max){const t=max?value/max:0;return `hsl(${202-t*158} 78% ${42+t*17}%)`}
+function size(){const r=canvas.getBoundingClientRect(),d=devicePixelRatio||1,ctx=canvas.getContext('2d');canvas.width=r.width*d;canvas.height=r.height*d;ctx.setTransform(d,0,0,d,0,0);return [ctx,r.width,r.height]}
+function draw(grid){const [ctx,w,h]=size(),max=Math.max(...grid.flat(),.001),cx=w*.5,base=h*.77,sx=Math.min(w/19,31),sy=sx*view.pitch,sz=Math.min(h*.55,260)/Math.max(max,.001),co=Math.cos(view.yaw)*Math.SQRT2,si=Math.sin(view.yaw)*Math.SQRT2,project=(r,c,z=0)=>{const u=c-3.5,v=r-3.5;return{x:cx+(u*co-v*si)*sx,y:base+(u*si+v*co)*sy-z*sz}};ctx.clearRect(0,0,w,h);ctx.strokeStyle='#78b8df55';ctx.lineWidth=1;for(let sum=0;sum<=12;sum++)for(let r=0;r<7;r++){const c=sum-r;if(c<0||c>=7)continue;const q=[[r,c,grid[r][c]],[r,c+1,grid[r][c+1]],[r+1,c+1,grid[r+1][c+1]],[r+1,c,grid[r+1][c]]].map(p=>project(...p)),avg=([grid[r][c],grid[r][c+1],grid[r+1][c+1],grid[r+1][c]].reduce((a,b)=>a+b)/4);ctx.beginPath();q.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fillStyle=color(avg,max);ctx.globalAlpha=.88;ctx.fill();ctx.globalAlpha=1;ctx.stroke()}ctx.fillStyle='#b8d4e8';ctx.font='11px Segoe UI';ctx.fillText('Superfície estimada da carga',15,22)}
+function renderGrid(grid){const max=Math.max(...grid.flat(),.001);$('grid').replaceChildren(...grid.flat().map(v=>{const cell=document.createElement('div');cell.className='cell';cell.style.background=color(v,max);cell.textContent=fmt(v*100,1);cell.title=`Altura: ${fmt(v*100,2)} cm`;return cell}))}
+function render(reading){const grid=reading.height_grid_m;if(!Array.isArray(grid)||grid.length!==8)return;lastGrid=grid;$('nodeLabel').textContent=reading.node_id;$('updated').textContent=`Atualizado ${new Date(reading.created_at).toLocaleString('pt-BR')}`;$('liveStatus').textContent='Medição sincronizada';$('readingStatus').textContent=String(reading.status||'normal').toUpperCase();$('volume').textContent=fmt(reading.volume_m3,4);$('capacity').textContent=fmt(reading.capacity_percent);$('confidence').textContent=fmt(reading.confidence_percent);$('zones').textContent=reading.valid_zones;renderGrid(grid);draw(grid)}
+async function refresh(){const node=new URLSearchParams(location.search).get('node_id'),response=await fetch(`/api/readings/latest${node?`?node_id=${encodeURIComponent(node)}`:''}`,{cache:'no-store'}),reading=await response.json();if(reading.status==='no_data')return;render(reading)}
+canvas.addEventListener('pointerdown',e=>{view.drag=true;view.x=e.clientX;canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!view.drag)return;view.yaw+=(e.clientX-view.x)*.012;view.x=e.clientX;if(lastGrid)draw(lastGrid)});canvas.addEventListener('pointerup',()=>view.drag=false);window.addEventListener('resize',()=>lastGrid&&draw(lastGrid));refresh();setInterval(refresh,10000);
