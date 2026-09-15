@@ -65,6 +65,7 @@ def load_config():
         "EDGE_SYNC_BATCH_SIZE": int(os.getenv("EDGE_SYNC_BATCH_SIZE", "20")),
         "EDGE_NODE_TOKENS": node_tokens if isinstance(node_tokens, dict) else {},
         "HEARTBEAT_INTERVAL_SECONDS": int(os.getenv("HEARTBEAT_INTERVAL_SECONDS", "30")),
+        "COMMAND_POLL_INTERVAL_SECONDS": int(os.getenv("COMMAND_POLL_INTERVAL_SECONDS", "5")),
         "NODE_OFFLINE_AFTER_SECONDS": int(os.getenv("NODE_OFFLINE_AFTER_SECONDS", "120")),
         "AUTO_CLEANUP_ENABLED": _bool("AUTO_CLEANUP_ENABLED", True),
         "READINGS_RETENTION_DAYS": int(os.getenv("READINGS_RETENTION_DAYS", "45")),

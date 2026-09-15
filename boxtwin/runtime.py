@@ -24,6 +24,7 @@ class BoxTwinRuntime:
         self._thread = None
         self._last_cleanup_date = None
         self._last_heartbeat_at = None
+        self._last_command_poll_at = None
         self._sensor_status = "unknown"
 
     def calibrate(self):
@@ -119,6 +120,33 @@ class BoxTwinRuntime:
         self._thread = threading.Thread(target=self._loop, name="boxtwin-capture", daemon=True)
         self._thread.start()
 
+    def execute_remote_command(self, command):
+        """Run a centrally requested action locally, where the sensor and calibration live."""
+        action = command.get("action")
+        if action == "calibrate":
+            result = self.calibrate()
+            # Make the freshly calibrated empty surface visible to the central monitor.
+            if self.config.get("LIVE_SENSOR_SYNC_ENABLED"):
+                self.read_raw_sensor_grid()
+            return result
+        if action == "capture":
+            result = self.capture()
+            if result.get("status") == "not_calibrated":
+                raise RuntimeError(result["message"])
+            # The reading is durable locally first. Sync it immediately when a link exists.
+            self.edge_sync.process_queue()
+            return result
+        raise ValueError(f"Comando remoto não suportado: {action}")
+
+    def report_remote_command(self, command, ok, result=None, error=None):
+        """Return the command result now, or persist it locally until the link is restored."""
+        try:
+            self.edge_sync.complete_command(command["command_uuid"], self.config["BOX_NODE_ID"], ok, result=result, error=error)
+        except Exception:
+            self.database.enqueue_command_result(command["command_uuid"], self.config["BOX_NODE_ID"], {
+                "ok": bool(ok), "result": result, "error": error,
+            })
+
     def _loop(self):
         # Captura e alerta acontecem só por requisição explícita (botão "Capturar" no simulador,
         # POST /api/readings, ou sincronização de borda) — este laço de fundo NÃO chama self.capture()
@@ -132,8 +160,25 @@ class BoxTwinRuntime:
                 print(f"[BoxTwin] Falha no escalonamento: {exc}")
             try:
                 self.edge_sync.process_queue()
+                self.edge_sync.process_command_results()
             except Exception as exc:
                 print(f"[BoxTwin] Falha na sincronização edge/cloud: {exc}")
+            now = datetime.now(timezone.utc)
+            if (not self._last_command_poll_at or
+                    (now - self._last_command_poll_at).total_seconds() >= self.config["COMMAND_POLL_INTERVAL_SECONDS"]):
+                self._last_command_poll_at = now
+                try:
+                    command = self.edge_sync.next_command(self.config["BOX_NODE_ID"])
+                    if command:
+                        print(f"[BoxTwin] Executando comando remoto {command['action']} para {self.config['BOX_NODE_ID']}.")
+                        try:
+                            result = self.execute_remote_command(command)
+                            self.report_remote_command(command, True, result=result)
+                        except Exception as exc:
+                            self.report_remote_command(command, False, error=str(exc))
+                            print(f"[BoxTwin] Comando remoto falhou: {exc}")
+                except Exception as exc:
+                    print(f"[BoxTwin] Falha ao consultar comandos remotos: {exc}")
             if self.config.get("LIVE_SENSOR_SYNC_ENABLED") and self.config["SENSOR_MODE"] == "vl53l8cx":
                 try:
                     self.read_raw_sensor_grid()

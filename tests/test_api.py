@@ -144,6 +144,36 @@ def test_boxnode_heartbeat_authentication_and_dynamic_monitor(tmp_path):
     assert client.get("/box/BOX-01").status_code == 200
 
 
+def test_remote_commands_are_queued_claimed_and_reported_by_boxnode(tmp_path):
+    app = create_app({
+        "TESTING": True, "DATABASE_PATH": str(tmp_path / "test.db"),
+        "CALIBRATION_PATH": str(tmp_path / "calibration.json"), "SENSOR_MODE": "mock",
+        "EDGE_NODE_TOKENS": {"BOX-01": "box-01-token"},
+    })
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["admin_authenticated"] = True
+
+    queued = client.post("/api/admin/boxes/BOX-01/commands", json={"action": "capture"})
+    assert queued.status_code == 202
+    command_uuid = queued.get_json()["command"]["command_uuid"]
+    assert client.get("/api/edge/commands/next?node_id=BOX-01").status_code == 403
+
+    headers = {"Authorization": "Bearer box-01-token"}
+    claimed = client.get("/api/edge/commands/next?node_id=BOX-01", headers=headers)
+    assert claimed.status_code == 200
+    assert claimed.get_json()["command"]["command_uuid"] == command_uuid
+    assert claimed.get_json()["command"]["status"] == "claimed"
+
+    finished = client.post(f"/api/edge/commands/{command_uuid}/result", headers=headers, json={
+        "node_id": "BOX-01", "ok": True, "result": {"status": "normal"},
+    })
+    assert finished.status_code == 200
+    assert finished.get_json()["command"]["status"] == "succeeded"
+    commands = client.get("/api/admin/boxes/BOX-01/commands").get_json()["commands"]
+    assert commands[0]["result"] == {"status": "normal"}
+
+
 def test_local_raw_read_is_cached_for_the_live_twin(tmp_path):
     app = create_app({
         "TESTING": True,

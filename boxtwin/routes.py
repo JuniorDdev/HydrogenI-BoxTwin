@@ -295,6 +295,19 @@ def box_status(node_id):
     return jsonify(runtime().database.node_status(node_id, current_app.config["NODE_OFFLINE_AFTER_SECONDS"]) or {"status": "no_data", "node_id": node_id})
 
 
+@bp.route("/api/admin/boxes/<node_id>/commands", methods=["GET", "POST"])
+@admin_required
+def remote_box_commands(node_id):
+    if request.method == "GET":
+        return jsonify({"node_id": node_id, "commands": runtime().database.commands_for_node(node_id, request.args.get("limit", 10))})
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action", "")).strip().lower()
+    if action not in {"capture", "calibrate"}:
+        return jsonify({"error": "Ação inválida. Use capture ou calibrate."}), 400
+    command = runtime().database.enqueue_command(node_id, action, current_app.config.get("ADMIN_USERNAME", "admin"))
+    return jsonify({"accepted": True, "command": command}), 202
+
+
 @bp.get("/api/readings/history")
 def history():
     return jsonify(runtime().database.history(request.args.get("limit", 50)))
@@ -637,6 +650,34 @@ def edge_heartbeat():
         "api_status": "online",
         "sensor_mode": payload.get("sensor_mode"),
     })})
+
+
+@bp.get("/api/edge/commands/next")
+def edge_next_command():
+    node_id = request.args.get("node_id", "").strip()
+    if not node_id:
+        return jsonify({"accepted": False, "error": "node_id ausente."}), 400
+    if not valid_edge_token(node_id):
+        return jsonify({"accepted": False, "error": "Token inválido."}), 403
+    return jsonify({"accepted": True, "command": runtime().database.claim_next_command(node_id)})
+
+
+@bp.post("/api/edge/commands/<command_uuid>/result")
+def edge_command_result(command_uuid):
+    payload = request.get_json(silent=True) or {}
+    node_id = str(payload.get("node_id", "")).strip()
+    if not node_id:
+        return jsonify({"accepted": False, "error": "node_id ausente."}), 400
+    if not valid_edge_token(node_id):
+        return jsonify({"accepted": False, "error": "Token inválido."}), 403
+    if not isinstance(payload.get("ok"), bool):
+        return jsonify({"accepted": False, "error": "Campo ok deve ser booleano."}), 400
+    command = runtime().database.resolve_command(
+        command_uuid, node_id, payload["ok"], payload.get("result"), payload.get("error"),
+    )
+    if not command:
+        return jsonify({"accepted": False, "error": "Comando não encontrado ou já finalizado."}), 404
+    return jsonify({"accepted": True, "command": command})
 
 
 @bp.get("/manifest.webmanifest")

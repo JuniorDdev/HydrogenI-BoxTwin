@@ -298,6 +298,38 @@ class EdgeSyncService:
             return {"status": "disabled"}
         return self._post_json("/api/edge/heartbeat", payload, "HydrogenI-BoxTwin-Heartbeat/1.0")
 
+    def next_command(self, node_id):
+        """Ask the central queue for one action; this is always an outbound Raspberry request."""
+        if not self.enabled():
+            return None
+        query = parse.urlencode({"node_id": node_id})
+        return self._get_json(f"/api/edge/commands/next?{query}").get("command")
+
+    def complete_command(self, command_uuid, node_id, ok, result=None, error=None):
+        if not self.enabled():
+            return {"status": "disabled"}
+        return self._post_json(
+            f"/api/edge/commands/{command_uuid}/result",
+            {"node_id": node_id, "ok": bool(ok), "result": result, "error": error},
+            "HydrogenI-BoxTwin-CommandResult/1.0",
+        )
+
+    def process_command_results(self):
+        if not self.enabled():
+            return []
+        delivered = []
+        for item in self.database.command_result_batch(self.config["EDGE_SYNC_BATCH_SIZE"]):
+            try:
+                payload = json.loads(item["payload_json"])
+                response = self.complete_command(item["command_uuid"], item["node_id"], payload["ok"], payload.get("result"), payload.get("error"))
+                if not response.get("accepted"):
+                    raise RuntimeError(response.get("error") or "Resultado remoto recusado.")
+                self.database.mark_command_result_sent(item["command_uuid"])
+                delivered.append(item["command_uuid"])
+            except Exception as exc:
+                self.database.mark_command_result_failed(item["command_uuid"], exc)
+        return delivered
+
     def _post_reading(self, payload):
         return self._post_json("/api/edge/readings", payload, "HydrogenI-BoxTwin-EdgeSync/1.0")
 
@@ -320,6 +352,23 @@ class EdgeSyncService:
         except urlerror.HTTPError as exc:
             detail = exc.read().decode(errors="replace")[:400]
             raise RuntimeError(f"Falha no endpoint central ({exc.code}): {detail}") from exc
+
+    def _get_json(self, path):
+        endpoint = f"{self.config['EDGE_SYNC_TARGET_URL'].rstrip('/')}{path}"
+        req = request.Request(
+            endpoint,
+            headers={
+                "Authorization": f"Bearer {self.config['EDGE_SYNC_TOKEN']}",
+                "User-Agent": "HydrogenI-BoxTwin-CommandPoll/1.0",
+            },
+            method="GET",
+        )
+        try:
+            with request.urlopen(req, timeout=self.config["EDGE_SYNC_TIMEOUT_SECONDS"]) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urlerror.HTTPError as exc:
+            detail = exc.read().decode(errors="replace")[:400]
+            raise RuntimeError(f"Falha ao consultar comandos remotos ({exc.code}): {detail}") from exc
 
 
 class RagService:

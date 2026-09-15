@@ -138,6 +138,27 @@ class Database:
                     sensor_mode TEXT,
                     details_json TEXT NOT NULL DEFAULT '{}'
                 );
+                CREATE TABLE IF NOT EXISTS edge_commands (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    command_uuid TEXT NOT NULL UNIQUE,
+                    node_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    requested_at TEXT NOT NULL,
+                    requested_by TEXT,
+                    claimed_at TEXT,
+                    finished_at TEXT,
+                    result_json TEXT,
+                    error_message TEXT
+                );
+                CREATE TABLE IF NOT EXISTS edge_command_results (
+                    command_uuid TEXT PRIMARY KEY,
+                    node_id TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    last_error TEXT
+                );
             """)
             notification_columns = {row[1] for row in connection.execute("PRAGMA table_info(notification_log)")}
             for column in ("provider_message_id", "delivery_status", "recipient_id"):
@@ -147,6 +168,98 @@ class Database:
             connection.execute("CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, id)")
             connection.execute("CREATE INDEX IF NOT EXISTS idx_readings_created_at ON readings(created_at)")
             connection.execute("CREATE INDEX IF NOT EXISTS idx_readings_box_material ON readings(box_id, material_type)")
+            connection.execute("CREATE INDEX IF NOT EXISTS idx_edge_commands_node_status ON edge_commands(node_id, status, id)")
+
+    @staticmethod
+    def _command_payload(row):
+        if not row:
+            return None
+        item = dict(row)
+        item["result"] = json.loads(item.pop("result_json") or "null")
+        return item
+
+    def enqueue_command(self, node_id, action, requested_by=None):
+        from uuid import uuid4
+        now = datetime.now(timezone.utc).isoformat()
+        command_uuid = str(uuid4())
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO edge_commands (command_uuid, node_id, action, requested_at, requested_by)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (command_uuid, node_id, action, now, requested_by),
+            )
+            row = connection.execute("SELECT * FROM edge_commands WHERE command_uuid=?", (command_uuid,)).fetchone()
+        return self._command_payload(row)
+
+    def claim_next_command(self, node_id):
+        """Atomically deliver one queued action to the BoxNode polling the central API."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM edge_commands WHERE node_id=? AND status='pending' ORDER BY id LIMIT 1",
+                (node_id,),
+            ).fetchone()
+            if not row:
+                return None
+            connection.execute(
+                "UPDATE edge_commands SET status='claimed', claimed_at=? WHERE id=?",
+                (now, row["id"]),
+            )
+            row = connection.execute("SELECT * FROM edge_commands WHERE id=?", (row["id"],)).fetchone()
+        return self._command_payload(row)
+
+    def resolve_command(self, command_uuid, node_id, ok, result=None, error_message=None):
+        now = datetime.now(timezone.utc).isoformat()
+        status = "succeeded" if ok else "failed"
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE edge_commands
+                   SET status=?, finished_at=?, result_json=?, error_message=?
+                   WHERE command_uuid=? AND node_id=? AND status='claimed'""",
+                (status, now, json.dumps(result, ensure_ascii=False) if result is not None else None,
+                 str(error_message or "")[:1000] or None, command_uuid, node_id),
+            )
+            if not cursor.rowcount:
+                return None
+            row = connection.execute("SELECT * FROM edge_commands WHERE command_uuid=?", (command_uuid,)).fetchone()
+        return self._command_payload(row)
+
+    def commands_for_node(self, node_id, limit=10):
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM edge_commands WHERE node_id=? ORDER BY id DESC LIMIT ?",
+                (node_id, max(1, min(int(limit), 50))),
+            ).fetchall()
+        return [self._command_payload(row) for row in rows]
+
+    def enqueue_command_result(self, command_uuid, node_id, payload):
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO edge_command_results (command_uuid, node_id, payload_json)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(command_uuid) DO UPDATE SET payload_json=excluded.payload_json, status='pending'""",
+                (command_uuid, node_id, json.dumps(payload, ensure_ascii=False)),
+            )
+
+    def command_result_batch(self, limit=20):
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM edge_command_results WHERE status IN ('pending', 'failed') ORDER BY rowid LIMIT ?",
+                (max(1, min(int(limit), 100)),),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def mark_command_result_sent(self, command_uuid):
+        with self.connect() as connection:
+            connection.execute("UPDATE edge_command_results SET status='sent', last_error=NULL WHERE command_uuid=?", (command_uuid,))
+
+    def mark_command_result_failed(self, command_uuid, error_message):
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE edge_command_results SET status='failed', attempts=attempts+1, last_error=? WHERE command_uuid=?",
+                (str(error_message)[:500], command_uuid),
+            )
 
     def heartbeat(self, payload):
         now = datetime.now(timezone.utc).isoformat()
