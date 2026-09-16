@@ -59,10 +59,11 @@ Para a caixa atual, copie o perfil [config/caixa-papelao.env.example](config/cai
 BOX_LENGTH_M=0.145
 BOX_WIDTH_M=0.145
 BOX_HEIGHT_M=0.150
+HEIGHT_NOISE_FLOOR_M=0.005
 SENSOR_EDGE_DISTANCE_M=0.043
 ```
 
-`SENSOR_EDGE_DISTANCE_M` registra a posição física do sensor para a montagem; o cálculo de volume usa as três dimensões internas da caixa.
+`SENSOR_EDGE_DISTANCE_M` registra a posição física do sensor para a montagem; o cálculo de volume usa as três dimensões internas da caixa. `HEIGHT_NOISE_FLOOR_M=0.005` descarta variações inferiores a 5 mm, evitando que ruído do sensor seja exibido como carga. Após calibrar, faça uma captura para iniciar o monitoramento contínuo; a calibração sozinha não o inicia.
 
 ## Execução local
 

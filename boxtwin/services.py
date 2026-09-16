@@ -22,10 +22,11 @@ class CalibrationService:
 
 
 class VolumeService:
-    def __init__(self, length_m, width_m, height_m):
+    def __init__(self, length_m, width_m, height_m, noise_floor_m=0.005):
         self.length_m = length_m
         self.width_m = width_m
         self.height_m = height_m
+        self.noise_floor_m = max(float(noise_floor_m), 0.0)
         self.capacity_m3 = length_m * width_m * height_m
         self.cell_area_m2 = (length_m * width_m) / 64
 
@@ -37,6 +38,8 @@ class VolumeService:
             raise ValueError("A leitura deve conter uma matriz 8x8.")
         paired = np.isfinite(empty) & np.isfinite(current)
         heights = np.where(paired, np.clip((empty - current) / 1000, 0, self.height_m), np.nan)
+        # Diferenças muito pequenas fazem parte do ruído normal do sensor; não representam carga.
+        heights = np.where(np.isfinite(heights) & (heights < self.noise_floor_m), 0.0, heights)
         valid_zones = int(paired.sum())
         mean_height_m = float(np.nanmean(heights)) if valid_zones else 0.0
         observed_volume_m3 = float(np.nansum(heights) * self.cell_area_m2)

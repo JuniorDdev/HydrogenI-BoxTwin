@@ -15,6 +15,14 @@ def test_half_full_box_volume():
     assert result["confidence_percent"] == 100.0
 
 
+def test_noise_floor_ignores_small_sensor_variation():
+    service = VolumeService(length_m=0.145, width_m=0.145, height_m=0.150, noise_floor_m=0.005)
+    result = service.calculate(grid(150), grid(146))
+    assert result["volume_m3"] == 0
+    assert result["capacity_percent"] == 0
+    assert all(value == 0 for row in result["height_grid_m"] for value in row)
+
+
 def test_capacity_alert():
     alerts = AlertService(85, 70).evaluate({"capacity_percent": 90, "confidence_percent": 100, "valid_zones": 64})
     assert alerts[0]["type"] == "capacity"

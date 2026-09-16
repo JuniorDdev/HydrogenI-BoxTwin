@@ -14,7 +14,10 @@ class BoxTwinRuntime:
         self.database = database
         self.sensor = build_sensor(config["SENSOR_MODE"], config["BOX_HEIGHT_M"], config)
         self.calibration = CalibrationService(config["CALIBRATION_PATH"])
-        self.volume = VolumeService(config["BOX_LENGTH_M"], config["BOX_WIDTH_M"], config["BOX_HEIGHT_M"])
+        self.volume = VolumeService(
+            config["BOX_LENGTH_M"], config["BOX_WIDTH_M"], config["BOX_HEIGHT_M"],
+            config.get("HEIGHT_NOISE_FLOOR_M", 0.005),
+        )
         self.alerts = AlertService(config["CAPACITY_ALERT_PERCENT"], config["MIN_CONFIDENCE_PERCENT"])
         self.rag = RagService(Path(__file__).parent / "knowledge" / "procedures.json")
         self.notifications = NotificationService(config, database, self.rag)
@@ -26,20 +29,46 @@ class BoxTwinRuntime:
         self._last_heartbeat_at = None
         self._last_command_poll_at = None
         self._sensor_status = "unknown"
-        self._live_monitoring_enabled = bool(database.runtime_setting("live_monitoring_enabled", True))
+        self._live_monitoring_started = bool(database.runtime_setting("live_monitoring_started", False))
+        self._live_monitoring_enabled = bool(database.runtime_setting("live_monitoring_enabled", False))
+        if not self._live_monitoring_started:
+            self._live_monitoring_enabled = False
         self._monitoring_lock = threading.RLock()
 
-    def set_live_monitoring(self, enabled):
-        """Enable or pause only the automatic physical reading loop."""
+    def start_live_monitoring(self):
+        """A successful capture is the only event that starts a monitoring session."""
         with self._monitoring_lock:
+            self._live_monitoring_started = True
+            self._live_monitoring_enabled = True
+            self.database.set_runtime_setting("live_monitoring_started", True)
+            self.database.set_runtime_setting("live_monitoring_enabled", True)
+            return self.live_monitoring_status()
+
+    def reset_live_monitoring(self):
+        """A new calibration invalidates the prior monitoring session until another capture."""
+        with self._monitoring_lock:
+            self._live_monitoring_started = False
+            self._live_monitoring_enabled = False
+            self.database.set_runtime_setting("live_monitoring_started", False)
+            self.database.set_runtime_setting("live_monitoring_enabled", False)
+            return self.live_monitoring_status()
+
+    def set_live_monitoring(self, enabled):
+        """Pause or resume an already started automatic physical reading loop."""
+        with self._monitoring_lock:
+            if enabled and not self._live_monitoring_started:
+                raise RuntimeError("Faça uma captura válida antes de iniciar o monitoramento.")
             self._live_monitoring_enabled = bool(enabled)
             self.database.set_runtime_setting("live_monitoring_enabled", self._live_monitoring_enabled)
             return self.live_monitoring_status()
 
     def live_monitoring_status(self):
         with self._monitoring_lock:
+            if not self._live_monitoring_started:
+                return {"enabled": False, "started": False, "status": "waiting_capture"}
             return {
                 "enabled": self._live_monitoring_enabled,
+                "started": True,
                 "status": "active" if self._live_monitoring_enabled else "paused",
             }
 
@@ -47,7 +76,13 @@ class BoxTwinRuntime:
         grid = self.sensor.read_distance_grid_mm()
         self._sensor_status = "online"
         self.calibration.save(grid)
-        return {"calibrated": True, "zones": 64, "message": "Linha de base do box vazio salva."}
+        monitoring = self.reset_live_monitoring()
+        return {
+            "calibrated": True,
+            "zones": 64,
+            "message": "Linha de base do box vazio salva. Faça uma captura para iniciar o monitoramento.",
+            "live_monitoring": monitoring,
+        }
 
     def read_raw_sensor_grid(self):
         """Return the physical sensor's distance grid without calibration or volume math."""
@@ -130,7 +165,11 @@ class BoxTwinRuntime:
             "synced_at": datetime.now(timezone.utc).isoformat(),
         }
         self.edge_sync.enqueue(reading_id, sync_payload)
-        return {**reading, "id": reading_id, "created_at": created_at, "anomaly_ids": [a["id"] for a in anomaly_records]}
+        monitoring = self.start_live_monitoring()
+        return {
+            **reading, "id": reading_id, "created_at": created_at,
+            "anomaly_ids": [a["id"] for a in anomaly_records], "live_monitoring": monitoring,
+        }
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -142,11 +181,8 @@ class BoxTwinRuntime:
         """Run a centrally requested action locally, where the sensor and calibration live."""
         action = command.get("action")
         if action == "calibrate":
-            result = self.calibrate()
-            # Make the freshly calibrated empty surface visible to the central monitor.
-            if self.config.get("LIVE_SENSOR_SYNC_ENABLED"):
-                self.read_raw_sensor_grid()
-            return result
+            # Calibrar só registra a referência vazia; não inicia nem atualiza o monitoramento ao vivo.
+            return self.calibrate()
         if action == "capture":
             result = self.capture()
             if result.get("status") == "not_calibrated":
@@ -198,7 +234,8 @@ class BoxTwinRuntime:
                             print(f"[BoxTwin] Comando remoto falhou: {exc}")
                 except Exception as exc:
                     print(f"[BoxTwin] Falha ao consultar comandos remotos: {exc}")
-            monitoring_enabled = self.live_monitoring_status()["enabled"]
+            monitoring = self.live_monitoring_status()
+            monitoring_enabled = monitoring["enabled"] and monitoring["started"]
             automatic_measurement = (monitoring_enabled and self.config.get("LIVE_MEASUREMENT_ENABLED")
                                      and self.config["SENSOR_MODE"] == "vl53l8cx")
             if (monitoring_enabled and self.config.get("LIVE_SENSOR_SYNC_ENABLED")
