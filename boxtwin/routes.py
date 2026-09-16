@@ -307,14 +307,14 @@ def remote_box_commands(node_id):
         return jsonify({"node_id": node_id, "commands": runtime().database.commands_for_node(node_id, request.args.get("limit", 10))})
     payload = request.get_json(silent=True) or {}
     action = str(payload.get("action", "")).strip().lower()
-    if action not in {"capture", "calibrate", "pause_monitoring", "resume_monitoring"}:
+    if action not in {"capture", "calibrate", "pause_monitoring", "resume_monitoring", "set_material"}:
         return jsonify({"error": "Ação inválida."}), 400
     gate = runtime().database.command_gate(node_id, current_app.config["REMOTE_COMMAND_COOLDOWN_SECONDS"])
     if not gate["allowed"]:
         if gate.get("reason") == "in_progress":
             return jsonify({"error": "Já existe um comando aguardando ou em execução para este BoxNode.", **gate}), 409
         return jsonify({"error": "Aguarde antes de solicitar outro comando.", **gate}), 429
-    metadata = payload.get("metadata") if action == "capture" else None
+    metadata = payload.get("metadata") if action in {"capture", "set_material"} else None
     if metadata is not None:
         if not isinstance(metadata, dict):
             return jsonify({"error": "Metadados do material inválidos."}), 400
@@ -331,7 +331,7 @@ def remote_box_commands(node_id):
         }
     command = runtime().database.enqueue_command(
         node_id, action, current_app.config.get("ADMIN_USERNAME", "admin"),
-        {"metadata": metadata} if metadata else {},
+        {"metadata": metadata} if action == "set_material" or metadata else {},
     )
     return jsonify({"accepted": True, "command": command,
                     "cooldown_seconds": current_app.config["REMOTE_COMMAND_COOLDOWN_SECONDS"]}), 202
@@ -699,6 +699,7 @@ def edge_heartbeat():
         "api_status": "online",
         "sensor_mode": payload.get("sensor_mode"),
         "live_monitoring": payload.get("live_monitoring"),
+        "active_material": payload.get("active_material"),
     })})
 
 

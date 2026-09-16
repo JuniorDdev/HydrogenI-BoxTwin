@@ -36,7 +36,7 @@ class BoxTwinRuntime:
         self._monitoring_lock = threading.RLock()
 
     def start_live_monitoring(self):
-        """A successful capture is the only event that starts a monitoring session."""
+        """Start a monitoring session after calibration."""
         with self._monitoring_lock:
             self._live_monitoring_started = True
             self._live_monitoring_enabled = True
@@ -75,6 +75,17 @@ class BoxTwinRuntime:
                 "status": "active" if self._live_monitoring_enabled else "paused",
             }
 
+    def active_material(self):
+        material = self.database.runtime_setting("active_material", None)
+        return material if isinstance(material, dict) else None
+
+    def set_active_material(self, material):
+        """Persist the material selected remotely for all subsequent local captures."""
+        if material is not None and not isinstance(material, dict):
+            raise ValueError("Material ativo inválido.")
+        self.database.set_runtime_setting("active_material", material)
+        return {"active_material": material, "message": "Material ativo atualizado." if material else "Material ativo removido; será usado o padrão local."}
+
     def calibrate(self):
         grid = self.sensor.read_distance_grid_mm()
         self._sensor_status = "online"
@@ -83,7 +94,7 @@ class BoxTwinRuntime:
         return {
             "calibrated": True,
             "zones": 64,
-            "message": "Linha de base do box vazio salva. Faça uma captura para iniciar o monitoramento.",
+            "message": "Linha de base do box vazio salva. Use Iniciar/retomar monitoramento para ativar o ciclo contínuo.",
             "live_monitoring": monitoring,
         }
 
@@ -108,7 +119,8 @@ class BoxTwinRuntime:
         return payload
 
     def capture(self, metadata=None, notify=True, distance_grid_mm=None):
-        metadata = metadata or {}
+        # Metadados do comando manual podem complementar o material ativo do BoxNode.
+        metadata = {**(self.active_material() or {}), **(metadata or {})}
         started_at = datetime.now(timezone.utc)
         empty = self.calibration.load()
         if empty is None:
@@ -194,6 +206,9 @@ class BoxTwinRuntime:
             # The reading is durable locally first. Sync it immediately when a link exists.
             self.edge_sync.process_queue()
             return result
+        if action == "set_material":
+            payload = command.get("payload") or {}
+            return self.set_active_material(payload.get("metadata"))
         if action == "pause_monitoring":
             return self.set_live_monitoring(False)
         if action == "resume_monitoring":
@@ -272,6 +287,7 @@ class BoxTwinRuntime:
                         "box_height_m": self.config["BOX_HEIGHT_M"],
                         "sensor_edge_distance_m": self.config["SENSOR_EDGE_DISTANCE_M"],
                         "live_monitoring": self.live_monitoring_status(),
+                        "active_material": self.active_material(),
                     })
                     self._last_heartbeat_at = now
                 except Exception as exc:

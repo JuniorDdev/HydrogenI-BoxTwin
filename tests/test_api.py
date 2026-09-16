@@ -190,6 +190,16 @@ def test_remote_commands_are_queued_claimed_and_reported_by_boxnode(tmp_path):
     })
     resumed = client.post("/api/admin/boxes/BOX-01/commands", json={"action": "resume_monitoring"})
     assert resumed.status_code == 202
+    resume_uuid = resumed.get_json()["command"]["command_uuid"]
+    client.get("/api/edge/commands/next?node_id=BOX-01", headers=headers)
+    client.post(f"/api/edge/commands/{resume_uuid}/result", headers=headers, json={
+        "node_id": "BOX-01", "ok": True, "result": {"status": "active"},
+    })
+    material = client.post("/api/admin/boxes/BOX-01/commands", json={"action": "set_material", "metadata": {
+        "material_type": "graos", "material_name": "Grãos", "density_t_m3": .7,
+    }})
+    assert material.status_code == 202
+    assert material.get_json()["command"]["payload"]["metadata"]["material_type"] == "graos"
 
 
 def test_local_raw_read_is_cached_for_the_live_twin(tmp_path):
@@ -238,6 +248,10 @@ def test_calibration_requires_manual_start_for_live_monitoring(tmp_path):
     assert result["estimated_tons"] is not None
     assert result["live_monitoring"]["status"] == "waiting_capture"
     assert runtime.set_live_monitoring(True)["status"] == "active"
+    runtime.set_active_material({"material_type": "graos", "material_name": "Grãos", "density_t_m3": .7})
+    automatic = runtime.capture(distance_grid_mm=[[400 for _ in range(8)] for _ in range(8)])
+    assert automatic["material_type"] == "graos"
+    assert automatic["estimated_tons"] is not None
     assert runtime.calibrate()["live_monitoring"]["status"] == "waiting_capture"
 
 
