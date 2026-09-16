@@ -65,7 +65,7 @@ SENSOR_EDGE_DISTANCE_M=0.043
 
 `SENSOR_EDGE_DISTANCE_M` registra a posição física do sensor para a montagem; o cálculo de volume usa as três dimensões internas da caixa. `HEIGHT_NOISE_FLOOR_M=0.005` descarta variações inferiores a 5 mm, evitando que ruído do sensor seja exibido como carga. Calibrar e capturar são ações pontuais; use **Iniciar/retomar monitoramento** para começar o ciclo contínuo após a calibração. O peso é uma estimativa calculada por `volume × MATERIAL_DENSITY_T_M3`; ajuste a densidade ao material e às suas condições de umidade e compactação.
 
-No painel de cada BoxNode, o seletor **Material** fica ao lado do seletor de box. A escolha usa densidades médias e segue junto com a próxima captura remota, ficando registrada com aquela leitura. Se “Material padrão do Raspberry” estiver selecionado, o sistema usa os valores `MATERIAL_*` do `.env`.
+No painel de cada BoxNode, o seletor **Material** fica ao lado do seletor de box. A escolha usa densidades médias e segue junto com a próxima captura remota, ficando registrada com aquela leitura. Se “Material padrão do Raspberry” estiver selecionado, o sistema usa os valores `MATERIAL_*` do `.env`. No catálogo também estão Ureia granulada (0,75 t/m³), NPK granulado (1,03 t/m³), MAP/DAP (0,98 t/m³), KCl (1,08 t/m³), sulfato de amônio (0,93 t/m³) e fertilizante orgânico (0,60 t/m³). Essas são médias de referência; prevalece a densidade da ficha técnica do fornecedor quando disponível.
 
 ## Execução local
 

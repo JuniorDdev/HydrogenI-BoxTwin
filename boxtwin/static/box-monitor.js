@@ -7,7 +7,13 @@ const materials=[
   {type:'terra',name:'Terra',density:1.30,label:'Terra · 1,30 t/m³'},
   {type:'graos',name:'Grãos',density:.70,label:'Grãos · 0,70 t/m³'},
   {type:'racao',name:'Ração',density:.60,label:'Ração · 0,60 t/m³'},
-  {type:'plastico_moido',name:'Plástico moído',density:.45,label:'Plástico moído · 0,45 t/m³'}
+  {type:'plastico_moido',name:'Plástico moído',density:.45,label:'Plástico moído · 0,45 t/m³'},
+  {type:'ureia_granulada',name:'Ureia granulada',density:.75,label:'Ureia granulada · 0,75 t/m³'},
+  {type:'npk_granulado',name:'NPK granulado',density:1.03,label:'NPK granulado · 1,03 t/m³'},
+  {type:'map_dap',name:'MAP/DAP',density:.98,label:'MAP/DAP · 0,98 t/m³'},
+  {type:'cloreto_potassio',name:'Cloreto de potássio (KCl)',density:1.08,label:'Cloreto de potássio (KCl) · 1,08 t/m³'},
+  {type:'sulfato_amonio',name:'Sulfato de amônio',density:.93,label:'Sulfato de amônio · 0,93 t/m³'},
+  {type:'fertilizante_organico',name:'Fertilizante orgânico',density:.60,label:'Fertilizante orgânico · 0,60 t/m³'}
 ];
 const materialKey=()=>`boxtwin-material-${nodeId}`;
 function selectedMaterial(){const item=materials.find(x=>x.type===$('materialSelector').value);return item?.density==null?null:{material_type:item.type,material_name:item.name,density_t_m3:item.density}}
