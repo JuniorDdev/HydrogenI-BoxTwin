@@ -81,11 +81,11 @@ def test_edge_ingest_is_idempotent(tmp_path):
         "reading_uuid": "demo-reading-001",
         "node_id": "BOX-DEMO-01",
         "volume_m3": 0.06,
-        "capacity_percent": 50.0,
+        "capacity_percent": 99.1,
         "confidence_percent": 100.0,
         "valid_zones": 64,
-        "status": "normal",
-        "alerts": [],
+        "status": "alert",
+        "alerts": [{"type": "capacity", "level": "warning", "message": "Capacidade próxima do limite."}],
         "height_grid_m": [[0.25 for _ in range(8)] for _ in range(8)],
         "scenario": "flat_50",
         "reference_percent": 50.0,
@@ -100,6 +100,9 @@ def test_edge_ingest_is_idempotent(tmp_path):
     assert first.get_json()["created"] is True
     assert second.status_code == 200
     assert second.get_json()["created"] is False
+    anomalies = client.get("/api/boxes/BOX-DEMO-01/anomalies").get_json()
+    assert len(anomalies) == 1
+    assert anomalies[0]["anomaly_type"] == "capacity"
 
 
 def test_live_grid_is_ingested_and_exposed(tmp_path):
@@ -148,7 +151,7 @@ def test_remote_commands_are_queued_claimed_and_reported_by_boxnode(tmp_path):
     app = create_app({
         "TESTING": True, "DATABASE_PATH": str(tmp_path / "test.db"),
         "CALIBRATION_PATH": str(tmp_path / "calibration.json"), "SENSOR_MODE": "mock",
-        "EDGE_NODE_TOKENS": {"BOX-01": "box-01-token"},
+        "EDGE_NODE_TOKENS": {"BOX-01": "box-01-token"}, "REMOTE_COMMAND_COOLDOWN_SECONDS": 0,
     })
     client = app.test_client()
     with client.session_transaction() as session:
@@ -156,6 +159,7 @@ def test_remote_commands_are_queued_claimed_and_reported_by_boxnode(tmp_path):
 
     queued = client.post("/api/admin/boxes/BOX-01/commands", json={"action": "capture"})
     assert queued.status_code == 202
+    assert client.post("/api/admin/boxes/BOX-01/commands", json={"action": "calibrate"}).status_code == 409
     command_uuid = queued.get_json()["command"]["command_uuid"]
     assert client.get("/api/edge/commands/next?node_id=BOX-01").status_code == 403
 
@@ -174,8 +178,13 @@ def test_remote_commands_are_queued_claimed_and_reported_by_boxnode(tmp_path):
     assert commands[0]["result"] == {"status": "normal"}
 
     paused = client.post("/api/admin/boxes/BOX-01/commands", json={"action": "pause_monitoring"})
-    resumed = client.post("/api/admin/boxes/BOX-01/commands", json={"action": "resume_monitoring"})
     assert paused.status_code == 202
+    pause_uuid = paused.get_json()["command"]["command_uuid"]
+    client.get("/api/edge/commands/next?node_id=BOX-01", headers=headers)
+    client.post(f"/api/edge/commands/{pause_uuid}/result", headers=headers, json={
+        "node_id": "BOX-01", "ok": True, "result": {"status": "paused"},
+    })
+    resumed = client.post("/api/admin/boxes/BOX-01/commands", json={"action": "resume_monitoring"})
     assert resumed.status_code == 202
 
 

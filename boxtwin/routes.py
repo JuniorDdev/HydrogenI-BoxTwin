@@ -309,8 +309,14 @@ def remote_box_commands(node_id):
     action = str(payload.get("action", "")).strip().lower()
     if action not in {"capture", "calibrate", "pause_monitoring", "resume_monitoring"}:
         return jsonify({"error": "Ação inválida."}), 400
+    gate = runtime().database.command_gate(node_id, current_app.config["REMOTE_COMMAND_COOLDOWN_SECONDS"])
+    if not gate["allowed"]:
+        if gate.get("reason") == "in_progress":
+            return jsonify({"error": "Já existe um comando aguardando ou em execução para este BoxNode.", **gate}), 409
+        return jsonify({"error": "Aguarde antes de solicitar outro comando.", **gate}), 429
     command = runtime().database.enqueue_command(node_id, action, current_app.config.get("ADMIN_USERNAME", "admin"))
-    return jsonify({"accepted": True, "command": command}), 202
+    return jsonify({"accepted": True, "command": command,
+                    "cooldown_seconds": current_app.config["REMOTE_COMMAND_COOLDOWN_SECONDS"]}), 202
 
 
 @bp.get("/api/readings/history")

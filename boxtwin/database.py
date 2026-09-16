@@ -176,6 +176,26 @@ class Database:
             connection.execute("CREATE INDEX IF NOT EXISTS idx_readings_created_at ON readings(created_at)")
             connection.execute("CREATE INDEX IF NOT EXISTS idx_readings_box_material ON readings(box_id, material_type)")
             connection.execute("CREATE INDEX IF NOT EXISTS idx_edge_commands_node_status ON edge_commands(node_id, status, id)")
+            # Versões anteriores gravavam os alertas dentro da leitura sincronizada,
+            # mas não os materializavam na lista operacional do Railway.
+            readings = connection.execute("SELECT id, created_at, alerts_json FROM readings").fetchall()
+            for reading in readings:
+                try:
+                    alerts = json.loads(reading["alerts_json"] or "[]")
+                except json.JSONDecodeError:
+                    alerts = []
+                for alert in alerts:
+                    alert_type = str(alert.get("type", "unknown"))
+                    message = str(alert.get("message", "Alerta sem descrição."))
+                    exists = connection.execute(
+                        "SELECT 1 FROM anomalies WHERE reading_id=? AND anomaly_type=? AND message=? LIMIT 1",
+                        (reading["id"], alert_type, message),
+                    ).fetchone()
+                    if not exists:
+                        connection.execute(
+                            "INSERT INTO anomalies (created_at, reading_id, anomaly_type, severity, message) VALUES (?, ?, ?, ?, ?)",
+                            (reading["created_at"], reading["id"], alert_type, str(alert.get("level", "warning")), message),
+                        )
 
     @staticmethod
     def _command_payload(row):
@@ -197,6 +217,25 @@ class Database:
             )
             row = connection.execute("SELECT * FROM edge_commands WHERE command_uuid=?", (command_uuid,)).fetchone()
         return self._command_payload(row)
+
+    def command_gate(self, node_id, cooldown_seconds=30):
+        """Prevent overlapping physical operations and rapid repeat requests."""
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM edge_commands WHERE node_id=? ORDER BY id DESC LIMIT 1", (node_id,)
+            ).fetchone()
+        if not row:
+            return {"allowed": True, "cooldown_remaining": 0}
+        command = self._command_payload(row)
+        if command["status"] in {"pending", "claimed"}:
+            return {"allowed": False, "reason": "in_progress", "command": command, "cooldown_remaining": 0}
+        try:
+            elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(command["requested_at"].replace("Z", "+00:00"))).total_seconds()
+        except (TypeError, ValueError):
+            elapsed = cooldown_seconds
+        remaining = max(0, int(cooldown_seconds - elapsed + 0.999))
+        return {"allowed": remaining == 0, "reason": "cooldown" if remaining else None,
+                "command": command, "cooldown_remaining": remaining}
 
     def claim_next_command(self, node_id):
         """Atomically deliver one queued action to the BoxNode polling the central API."""
@@ -482,7 +521,10 @@ class Database:
         existing = self.find_reading_by_uuid(reading["reading_uuid"])
         if existing:
             return existing["id"], existing["created_at"], False
-        return (*self.save_reading(reading), True)
+        reading_id, created_at = self.save_reading(reading)
+        # O Railway mantém sua própria lista operacional de anomalias.
+        self.save_anomalies(reading_id, reading.get("alerts", []))
+        return reading_id, created_at, True
 
     def latest(self):
         with self.connect() as connection:
