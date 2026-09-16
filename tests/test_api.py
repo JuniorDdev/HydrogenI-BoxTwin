@@ -173,6 +173,11 @@ def test_remote_commands_are_queued_claimed_and_reported_by_boxnode(tmp_path):
     commands = client.get("/api/admin/boxes/BOX-01/commands").get_json()["commands"]
     assert commands[0]["result"] == {"status": "normal"}
 
+    paused = client.post("/api/admin/boxes/BOX-01/commands", json={"action": "pause_monitoring"})
+    resumed = client.post("/api/admin/boxes/BOX-01/commands", json={"action": "resume_monitoring"})
+    assert paused.status_code == 202
+    assert resumed.status_code == 202
+
 
 def test_local_raw_read_is_cached_for_the_live_twin(tmp_path):
     app = create_app({
@@ -187,6 +192,20 @@ def test_local_raw_read_is_cached_for_the_live_twin(tmp_path):
     cached = client.get("/api/live-grid").get_json()
     assert cached["valid_zones"] == 64
     assert cached["distance_grid_mm"] == raw.get_json()["distance_grid_mm"]
+
+
+def test_live_monitoring_pause_is_persisted(tmp_path):
+    app = create_app({
+        "TESTING": True, "DATABASE_PATH": str(tmp_path / "test.db"),
+        "CALIBRATION_PATH": str(tmp_path / "calibration.json"), "SENSOR_MODE": "mock",
+    })
+    runtime = app.extensions["boxtwin_runtime"]
+    assert runtime.set_live_monitoring(False)["status"] == "paused"
+    restarted = create_app({
+        "TESTING": True, "DATABASE_PATH": str(tmp_path / "test.db"),
+        "CALIBRATION_PATH": str(tmp_path / "calibration.json"), "SENSOR_MODE": "mock",
+    }).extensions["boxtwin_runtime"]
+    assert restarted.live_monitoring_status()["enabled"] is False
 
 
 def test_admin_analytics_reports_operational_metadata(tmp_path):

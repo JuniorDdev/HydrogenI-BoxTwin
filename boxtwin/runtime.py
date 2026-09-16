@@ -26,6 +26,22 @@ class BoxTwinRuntime:
         self._last_heartbeat_at = None
         self._last_command_poll_at = None
         self._sensor_status = "unknown"
+        self._live_monitoring_enabled = bool(database.runtime_setting("live_monitoring_enabled", True))
+        self._monitoring_lock = threading.RLock()
+
+    def set_live_monitoring(self, enabled):
+        """Enable or pause only the automatic physical reading loop."""
+        with self._monitoring_lock:
+            self._live_monitoring_enabled = bool(enabled)
+            self.database.set_runtime_setting("live_monitoring_enabled", self._live_monitoring_enabled)
+            return self.live_monitoring_status()
+
+    def live_monitoring_status(self):
+        with self._monitoring_lock:
+            return {
+                "enabled": self._live_monitoring_enabled,
+                "status": "active" if self._live_monitoring_enabled else "paused",
+            }
 
     def calibrate(self):
         grid = self.sensor.read_distance_grid_mm()
@@ -138,6 +154,10 @@ class BoxTwinRuntime:
             # The reading is durable locally first. Sync it immediately when a link exists.
             self.edge_sync.process_queue()
             return result
+        if action == "pause_monitoring":
+            return self.set_live_monitoring(False)
+        if action == "resume_monitoring":
+            return self.set_live_monitoring(True)
         raise ValueError(f"Comando remoto não suportado: {action}")
 
     def report_remote_command(self, command, ok, result=None, error=None):
@@ -178,8 +198,11 @@ class BoxTwinRuntime:
                             print(f"[BoxTwin] Comando remoto falhou: {exc}")
                 except Exception as exc:
                     print(f"[BoxTwin] Falha ao consultar comandos remotos: {exc}")
-            automatic_measurement = self.config.get("LIVE_MEASUREMENT_ENABLED") and self.config["SENSOR_MODE"] == "vl53l8cx"
-            if self.config.get("LIVE_SENSOR_SYNC_ENABLED") and not automatic_measurement and self.config["SENSOR_MODE"] == "vl53l8cx":
+            monitoring_enabled = self.live_monitoring_status()["enabled"]
+            automatic_measurement = (monitoring_enabled and self.config.get("LIVE_MEASUREMENT_ENABLED")
+                                     and self.config["SENSOR_MODE"] == "vl53l8cx")
+            if (monitoring_enabled and self.config.get("LIVE_SENSOR_SYNC_ENABLED")
+                    and not automatic_measurement and self.config["SENSOR_MODE"] == "vl53l8cx"):
                 try:
                     self.read_raw_sensor_grid()
                 except Exception as exc:
@@ -206,6 +229,8 @@ class BoxTwinRuntime:
                         "box_length_m": self.config["BOX_LENGTH_M"],
                         "box_width_m": self.config["BOX_WIDTH_M"],
                         "box_height_m": self.config["BOX_HEIGHT_M"],
+                        "sensor_edge_distance_m": self.config["SENSOR_EDGE_DISTANCE_M"],
+                        "live_monitoring": self.live_monitoring_status(),
                     })
                     self._last_heartbeat_at = now
                 except Exception as exc:

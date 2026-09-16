@@ -28,6 +28,7 @@ def load_config():
         "BOX_LENGTH_M": float(os.getenv("BOX_LENGTH_M", "0.40")),
         "BOX_WIDTH_M": float(os.getenv("BOX_WIDTH_M", "0.40")),
         "BOX_HEIGHT_M": float(os.getenv("BOX_HEIGHT_M", "0.40")),
+        "SENSOR_EDGE_DISTANCE_M": float(os.getenv("SENSOR_EDGE_DISTANCE_M", "0")),
         "MATERIAL_TYPE": os.getenv("MATERIAL_TYPE", "nao_informado"),
         "MATERIAL_NAME": os.getenv("MATERIAL_NAME", "Não informado"),
         "MATERIAL_DENSITY_T_M3": float(os.getenv("MATERIAL_DENSITY_T_M3", "0")),

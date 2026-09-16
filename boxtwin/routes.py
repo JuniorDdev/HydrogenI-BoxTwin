@@ -307,8 +307,8 @@ def remote_box_commands(node_id):
         return jsonify({"node_id": node_id, "commands": runtime().database.commands_for_node(node_id, request.args.get("limit", 10))})
     payload = request.get_json(silent=True) or {}
     action = str(payload.get("action", "")).strip().lower()
-    if action not in {"capture", "calibrate"}:
-        return jsonify({"error": "Ação inválida. Use capture ou calibrate."}), 400
+    if action not in {"capture", "calibrate", "pause_monitoring", "resume_monitoring"}:
+        return jsonify({"error": "Ação inválida."}), 400
     command = runtime().database.enqueue_command(node_id, action, current_app.config.get("ADMIN_USERNAME", "admin"))
     return jsonify({"accepted": True, "command": command}), 202
 
@@ -674,6 +674,7 @@ def edge_heartbeat():
         "sensor_status": payload.get("sensor_status", "unknown"),
         "api_status": "online",
         "sensor_mode": payload.get("sensor_mode"),
+        "live_monitoring": payload.get("live_monitoring"),
     })})
 
 

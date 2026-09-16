@@ -161,6 +161,11 @@ class Database:
                     attempts INTEGER NOT NULL DEFAULT 0,
                     last_error TEXT
                 );
+                CREATE TABLE IF NOT EXISTS runtime_settings (
+                    setting_key TEXT PRIMARY KEY,
+                    value_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
             """)
             notification_columns = {row[1] for row in connection.execute("PRAGMA table_info(notification_log)")}
             for column in ("provider_message_id", "delivery_status", "recipient_id"):
@@ -277,6 +282,22 @@ class Database:
                   payload.get("sensor_status", "unknown"), payload.get("api_status", "online"),
                   payload.get("sensor_mode"), json.dumps(payload, ensure_ascii=False)))
         return self.node_status(payload["node_id"])
+
+    def runtime_setting(self, setting_key, default=None):
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT value_json FROM runtime_settings WHERE setting_key=?", (setting_key,)
+            ).fetchone()
+        return default if not row else json.loads(row["value_json"])
+
+    def set_runtime_setting(self, setting_key, value):
+        now = datetime.now(timezone.utc).isoformat()
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO runtime_settings (setting_key, value_json, updated_at) VALUES (?, ?, ?)
+                   ON CONFLICT(setting_key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at""",
+                (setting_key, json.dumps(value), now),
+            )
 
     def node_status(self, node_id, offline_after_seconds=120):
         with self.connect() as connection:

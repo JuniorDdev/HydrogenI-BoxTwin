@@ -51,15 +51,18 @@ Box → sensor 8×8 → Raspberry/Edge → cálculo volumétrico → SQLite/fila
 
 ## Estado do sensor físico
 
-O modo funcional atual é:
+O Raspberry Pi opera com o **VL53L8CX** e o driver ST ULD Linux 2.1.0. O nó local lê a matriz física 8 × 8 e pode enviar a grade bruta ao Railway para o gêmeo 3D.
+
+Para a caixa atual, copie o perfil [config/caixa-papelao.env.example](config/caixa-papelao.env.example) para o `.env` do Raspberry. Ele usa as medidas internas validadas:
 
 ```env
-SENSOR_MODE=mock
+BOX_LENGTH_M=0.145
+BOX_WIDTH_M=0.145
+BOX_HEIGHT_M=0.150
+SENSOR_EDGE_DISTANCE_M=0.043
 ```
 
-Os adaptadores `vl53l5cx` e `vl53l8cx` já reservam o ponto de integração em
-`boxtwin/sensors/`, mas ainda precisam receber o driver e a leitura real do hardware. Portanto, os
-resultados do simulador demonstram o fluxo do produto, não a precisão final do sensor físico.
+`SENSOR_EDGE_DISTANCE_M` registra a posição física do sensor para a montagem; o cálculo de volume usa as três dimensões internas da caixa.
 
 ## Execução local
 
@@ -140,7 +143,7 @@ O Railway injeta `PORT` automaticamente. Não versione `.env`, chaves ou senhas.
 | Grupo | Variáveis |
 |---|---|
 | Aplicação | `APP_HOST`, `APP_PORT`, `PORT`, `APP_DEBUG`, `PUBLIC_BASE_URL` |
-| Box/sensor | `SENSOR_MODE`, `BOX_NODE_ID`, `BOX_NAME`, `BOX_LENGTH_M`, `BOX_WIDTH_M`, `BOX_HEIGHT_M`, `SAMPLE_INTERVAL_SECONDS` |
+| Box/sensor | `SENSOR_MODE`, `BOX_NODE_ID`, `BOX_NAME`, `BOX_LENGTH_M`, `BOX_WIDTH_M`, `BOX_HEIGHT_M`, `SENSOR_EDGE_DISTANCE_M`, `SAMPLE_INTERVAL_SECONDS` |
 | Alertas | `CAPACITY_ALERT_PERCENT`, `MIN_CONFIDENCE_PERCENT`, `NOTIFY_COOLDOWN_SECONDS` |
 | Persistência | `DATABASE_PATH`, `CALIBRATION_PATH` |
 | Segurança | `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` |
@@ -153,6 +156,8 @@ O Railway injeta `PORT` automaticamente. Não versione `.env`, chaves ou senhas.
 ## Gêmeo 3D do sensor sem calibração
 
 Em um BoxNode físico, configure `LIVE_SENSOR_SYNC_ENABLED=true` junto com a sincronização de borda. O Raspberry envia a matriz bruta 8 × 8 periodicamente para o Railway, sem calcular volume ou criar alertas. A visualização remota fica em `/gemeo-sensor` e mostra proximidade relativa ao sensor.
+
+No painel remoto do nó, em `/box/<BOX_NODE_ID>`, um administrador pode usar **Pausar monitoramento** e **Retomar monitoramento**. A pausa interrompe apenas leituras automáticas; o Raspberry continua conectado, envia heartbeat e mantém as leituras já gravadas.
 
 ## Testes
 
