@@ -219,17 +219,16 @@ def test_live_monitoring_pause_is_persisted(tmp_path):
     assert restarted.live_monitoring_status()["started"] is True
 
 
-def test_calibration_waits_for_capture_before_live_monitoring(tmp_path):
+def test_calibration_requires_manual_start_for_live_monitoring(tmp_path):
     app = create_app({
         "TESTING": True, "DATABASE_PATH": str(tmp_path / "test.db"),
         "CALIBRATION_PATH": str(tmp_path / "calibration.json"), "SENSOR_MODE": "mock",
     })
     runtime = app.extensions["boxtwin_runtime"]
     assert runtime.calibrate()["live_monitoring"]["status"] == "waiting_capture"
-    with pytest.raises(RuntimeError, match="captura válida"):
-        runtime.set_live_monitoring(True)
     result = runtime.capture(distance_grid_mm=[[400 for _ in range(8)] for _ in range(8)])
-    assert result["live_monitoring"]["status"] == "active"
+    assert result["live_monitoring"]["status"] == "waiting_capture"
+    assert runtime.set_live_monitoring(True)["status"] == "active"
     assert runtime.calibrate()["live_monitoring"]["status"] == "waiting_capture"
 
 

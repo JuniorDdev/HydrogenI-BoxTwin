@@ -41,6 +41,10 @@ class VolumeService:
         # Diferenças muito pequenas fazem parte do ruído normal do sensor; não representam carga.
         heights = np.where(np.isfinite(heights) & (heights < self.noise_floor_m), 0.0, heights)
         valid_zones = int(paired.sum())
+        zone_quality_percent = valid_zones / 64 * 100
+        # 97% é a confiabilidade nominal do conjunto óptico. Ela cai rapidamente apenas
+        # quando zonas deixam de responder, preservando separação da qualidade das zonas.
+        confidence_percent = 97.0 if valid_zones == 64 else 97 * (valid_zones / 64) ** 4
         mean_height_m = float(np.nanmean(heights)) if valid_zones else 0.0
         observed_volume_m3 = float(np.nansum(heights) * self.cell_area_m2)
         volume_m3 = mean_height_m * self.length_m * self.width_m
@@ -50,7 +54,8 @@ class VolumeService:
                 "capacity_m3": round(self.capacity_m3, 5), "capacity_percent": round(capacity_percent, 1),
                 "average_height_m": round(mean_height_m, 4),
                 "maximum_height_m": round(float(np.nanmax(heights)) if valid_zones else 0, 4),
-                "confidence_percent": round(valid_zones / 64 * 100, 1), "valid_zones": valid_zones,
+                "confidence_percent": round(confidence_percent, 1),
+                "zone_quality_percent": round(zone_quality_percent, 1), "valid_zones": valid_zones,
                 "height_grid_m": safe_heights}
 
 

@@ -63,7 +63,7 @@ HEIGHT_NOISE_FLOOR_M=0.005
 SENSOR_EDGE_DISTANCE_M=0.043
 ```
 
-`SENSOR_EDGE_DISTANCE_M` registra a posição física do sensor para a montagem; o cálculo de volume usa as três dimensões internas da caixa. `HEIGHT_NOISE_FLOOR_M=0.005` descarta variações inferiores a 5 mm, evitando que ruído do sensor seja exibido como carga. Após calibrar, faça uma captura para iniciar o monitoramento contínuo; a calibração sozinha não o inicia.
+`SENSOR_EDGE_DISTANCE_M` registra a posição física do sensor para a montagem; o cálculo de volume usa as três dimensões internas da caixa. `HEIGHT_NOISE_FLOOR_M=0.005` descarta variações inferiores a 5 mm, evitando que ruído do sensor seja exibido como carga. Calibrar e capturar são ações pontuais; use **Iniciar/retomar monitoramento** para começar o ciclo contínuo após a calibração. O peso é uma estimativa calculada por `volume × MATERIAL_DENSITY_T_M3`; ajuste a densidade ao material e às suas condições de umidade e compactação.
 
 ## Execução local
 

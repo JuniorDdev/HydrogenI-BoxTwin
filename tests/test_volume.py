@@ -12,7 +12,8 @@ def test_half_full_box_volume():
     result = service.calculate(grid(400), grid(200))
     assert result["volume_m3"] == pytest.approx(0.032)
     assert result["capacity_percent"] == pytest.approx(50.0)
-    assert result["confidence_percent"] == 100.0
+    assert result["confidence_percent"] == 97.0
+    assert result["zone_quality_percent"] == 100.0
 
 
 def test_noise_floor_ignores_small_sensor_variation():
@@ -40,7 +41,8 @@ def test_partial_sensor_grid_projects_valid_mean_without_zero_fill():
     current[0][0] = None
     result = service.calculate(grid(400), current)
     assert result["valid_zones"] == 63
-    assert result["confidence_percent"] == pytest.approx(98.4)
+    assert result["confidence_percent"] == pytest.approx(91.1)
+    assert result["zone_quality_percent"] == pytest.approx(98.4)
     assert result["average_height_m"] == pytest.approx(0.2)
     assert result["volume_m3"] == pytest.approx(0.032)
     assert result["height_grid_m"][0][0] is None

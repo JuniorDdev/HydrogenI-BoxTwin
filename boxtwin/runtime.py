@@ -57,7 +57,10 @@ class BoxTwinRuntime:
         """Pause or resume an already started automatic physical reading loop."""
         with self._monitoring_lock:
             if enabled and not self._live_monitoring_started:
-                raise RuntimeError("Faça uma captura válida antes de iniciar o monitoramento.")
+                if self.calibration.load() is None:
+                    raise RuntimeError("Calibre o box vazio antes de iniciar o monitoramento.")
+                self._live_monitoring_started = True
+                self.database.set_runtime_setting("live_monitoring_started", True)
             self._live_monitoring_enabled = bool(enabled)
             self.database.set_runtime_setting("live_monitoring_enabled", self._live_monitoring_enabled)
             return self.live_monitoring_status()
@@ -165,10 +168,10 @@ class BoxTwinRuntime:
             "synced_at": datetime.now(timezone.utc).isoformat(),
         }
         self.edge_sync.enqueue(reading_id, sync_payload)
-        monitoring = self.start_live_monitoring()
         return {
             **reading, "id": reading_id, "created_at": created_at,
-            "anomaly_ids": [a["id"] for a in anomaly_records], "live_monitoring": monitoring,
+            "anomaly_ids": [a["id"] for a in anomaly_records],
+            "live_monitoring": self.live_monitoring_status(),
         }
 
     def start(self):
