@@ -560,22 +560,28 @@ class Database:
             rows = connection.execute(f"SELECT anomalies.* FROM anomalies{join}{where} ORDER BY anomalies.id DESC LIMIT ? OFFSET ?", [*params, page_size, (page-1)*page_size]).fetchall()
         return {"items": [dict(row) for row in rows], "page": page, "page_size": page_size, "total": total, "pages": max(1, (total + page_size - 1) // page_size)}
 
-    def analytics(self, filters=None):
-        """Return manager KPIs while keeping legacy readings usable."""
+    def _reading_filters(self, filters=None, table="readings"):
         filters = filters or {}
         clauses, params = [], []
+        prefix = f"{table}." if table else ""
         for key, column in (("sensor_id", "sensor_id"), ("box_id", "box_id"), ("material_type", "material_type")):
             value = (filters.get(key) or "").strip()
             if value:
-                clauses.append(f"COALESCE({column}, node_id)=?")
+                clauses.append(f"COALESCE({prefix}{column}, {prefix}node_id)=?")
                 params.append(value)
         start, end = (filters.get("start") or "").strip(), (filters.get("end") or "").strip()
         if start:
-            clauses.append("created_at >= ?")
+            clauses.append(f"{prefix}created_at >= ?")
             params.append(start)
         if end:
-            clauses.append("created_at <= ?")
+            clauses.append(f"{prefix}created_at <= ?")
             params.append(end + "T23:59:59.999999+00:00" if len(end) == 10 else end)
+        return clauses, params
+
+    def analytics(self, filters=None):
+        """Return operational KPIs; inventory uses only the latest reading of each Box."""
+        filters = filters or {}
+        clauses, params = self._reading_filters(filters)
         where = " WHERE " + " AND ".join(clauses) if clauses else ""
         with self.connect() as connection:
             rows = connection.execute(f"SELECT * FROM readings{where} ORDER BY created_at", params).fetchall()
@@ -585,31 +591,33 @@ class Database:
                 "materials": [row[0] for row in connection.execute("SELECT DISTINCT COALESCE(material_type,'nao_informado') FROM readings ORDER BY 1")],
             }
         items = [self._serialize(row) for row in rows]
-        volumes = [item["volume_m3"] for item in items]
         durations = [item["reading_duration_ms"] for item in items if item["reading_duration_ms"] is not None]
-        tons = [item["estimated_tons"] for item in items if item["estimated_tons"] is not None]
         expected = [item for item in items if item["expected_volume_m3"] not in (None, 0)]
         deviations = [((item["volume_m3"] - item["expected_volume_m3"]) / item["expected_volume_m3"] * 100) for item in expected]
-        box_counts = {}
+        box_counts, latest_by_box, by_day = {}, {}, {}
         for item in items:
-            box_counts[item["box_id"] or item["node_id"]] = box_counts.get(item["box_id"] or item["node_id"], 0) + 1
-        expected_readings = max(0, int(filters.get("expected_reading_count") or 0))
+            box_key = item["box_id"] or item["node_id"]
+            box_counts[box_key] = box_counts.get(box_key, 0) + 1
+            latest_by_box[box_key] = item
+            key = item["created_at"][:10]
+            bucket = by_day.setdefault(key, {"date": key, "readings": 0, "sum_readings_volume_m3": 0.0, "sum_readings_estimated_tons": 0.0})
+            bucket["readings"] += 1
+            bucket["sum_readings_volume_m3"] += item["volume_m3"]
+            bucket["sum_readings_estimated_tons"] += item["estimated_tons"] or 0
+        snapshots = list(latest_by_box.values())
+        snapshot_volumes = [item["volume_m3"] for item in snapshots]
+        snapshot_tons = [item["estimated_tons"] for item in snapshots if item["estimated_tons"] is not None]
         positive_error_m3 = sum(item["volume_m3"] - item["expected_volume_m3"] for item in expected if item["volume_m3"] > item["expected_volume_m3"])
         negative_error_m3 = sum(item["expected_volume_m3"] - item["volume_m3"] for item in expected if item["volume_m3"] < item["expected_volume_m3"])
-        by_day = {}
-        for item in items:
-            key = item["created_at"][:10]
-            bucket = by_day.setdefault(key, {"date": key, "readings": 0, "volume_m3": 0.0, "estimated_tons": 0.0})
-            bucket["readings"] += 1
-            bucket["volume_m3"] += item["volume_m3"]
-            bucket["estimated_tons"] += item["estimated_tons"] or 0
+        expected_readings = max(0, int(filters.get("expected_reading_count") or 0))
         return {
-            "filters": options,
-            "items": items,
+            "filters": options, "items": items, "snapshots": snapshots,
             "kpis": {
-                "readings_count": len(items), "unique_boxes": len({item["box_id"] for item in items}),
-                "total_volume_m3": round(sum(volumes), 5), "average_volume_m3": round(sum(volumes) / len(volumes), 5) if volumes else 0,
-                "estimated_tons": round(sum(tons), 4), "average_reading_ms": round(sum(durations) / len(durations), 1) if durations else None,
+                "readings_count": len(items), "unique_boxes": len(latest_by_box),
+                "current_volume_m3": round(sum(snapshot_volumes), 5),
+                "current_estimated_tons": round(sum(snapshot_tons), 4),
+                "average_volume_m3": round(sum(item["volume_m3"] for item in items) / len(items), 5) if items else 0,
+                "average_reading_ms": round(sum(durations) / len(durations), 1) if durations else None,
                 "above_expected_count": sum(value > 10 for value in deviations), "below_expected_count": sum(value < -10 for value in deviations),
                 "average_deviation_percent": round(sum(deviations) / len(deviations), 2) if deviations else None,
                 "positive_error_m3": round(positive_error_m3, 5), "negative_error_m3": round(negative_error_m3, 5),
@@ -618,16 +626,38 @@ class Database:
                 "expected_readings": expected_readings,
                 "reading_count_difference": len(items) - expected_readings if expected_readings else None,
                 "reading_count_anomaly": expected_readings > 0 and len(items) != expected_readings,
-                "forecast_next_period_m3": round((sum(volumes) / len(volumes)) * min(30, max(1, len(by_day))), 5) if volumes else 0,
             },
-            "series": list(by_day.values()),
+            "series": [{**entry, "sum_readings_volume_m3": round(entry["sum_readings_volume_m3"], 5), "sum_readings_estimated_tons": round(entry["sum_readings_estimated_tons"], 4)} for entry in by_day.values()],
         }
+
+    def anomalies_filtered(self, filters=None, limit=100, status=None):
+        clauses, params = self._reading_filters(filters, "readings")
+        if status:
+            if status == "active":
+                clauses.append("anomalies.status IN ('open', 'acknowledged', 'in_progress')")
+            elif status == "closed":
+                clauses.append("anomalies.status IN ('resolved', 'false_positive')")
+            else:
+                clauses.append("anomalies.status=?")
+                params.append(status)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        query = "SELECT anomalies.* FROM anomalies JOIN readings ON readings.id=anomalies.reading_id" + where + " ORDER BY anomalies.id DESC LIMIT ?"
+        params.append(max(1, min(int(limit), 500)))
+        with self.connect() as connection:
+            return [dict(row) for row in connection.execute(query, params).fetchall()]
 
     def save_anomalies(self, reading_id, alerts):
         created_at = datetime.now(timezone.utc).isoformat()
         records = []
         with self.connect() as connection:
+            node = connection.execute("SELECT node_id FROM readings WHERE id=?", (reading_id,)).fetchone()
+            node_id = node["node_id"] if node else None
             for alert in alerts:
+                existing = connection.execute("""SELECT anomalies.id FROM anomalies JOIN readings ON readings.id=anomalies.reading_id
+                    WHERE readings.node_id=? AND anomalies.anomaly_type=?
+                    AND anomalies.status IN ('open', 'acknowledged', 'in_progress') ORDER BY anomalies.id DESC LIMIT 1""", (node_id, alert["type"])).fetchone()
+                if existing:
+                    continue
                 cursor = connection.execute(
                     "INSERT INTO anomalies (created_at, reading_id, anomaly_type, severity, message) VALUES (?, ?, ?, ?, ?)",
                     (created_at, reading_id, alert["type"], alert["level"], alert["message"]),

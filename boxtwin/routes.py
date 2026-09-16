@@ -177,7 +177,7 @@ def operational_report():
         limit = 50
     analytics = runtime().database.analytics(_analytics_filters())
     readings = analytics["items"][-limit:]
-    anomaly_items = runtime().database.anomalies(limit)
+    anomaly_items = runtime().database.anomalies_filtered(_analytics_filters(), limit)
     pdf_bytes = build_operational_report(
         box_name=current_app.config["BOX_NAME"],
         node_id=current_app.config["BOX_NODE_ID"],
@@ -206,7 +206,7 @@ def operational_report_excel():
         limit = 200
     analytics = runtime().database.analytics(_analytics_filters())
     readings = analytics["items"][-limit:]
-    anomalies = runtime().database.anomalies(limit, request.args.get("status"))
+    anomalies = runtime().database.anomalies_filtered(_analytics_filters(), limit, request.args.get("status"))
     workbook_bytes = build_operational_workbook(
         box_name=current_app.config["BOX_NAME"],
         node_id=current_app.config["BOX_NODE_ID"],

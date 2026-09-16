@@ -46,3 +46,15 @@ def test_partial_sensor_grid_projects_valid_mean_without_zero_fill():
     assert result["average_height_m"] == pytest.approx(0.2)
     assert result["volume_m3"] == pytest.approx(0.032)
     assert result["height_grid_m"][0][0] is None
+
+
+def test_active_anomaly_is_not_duplicated_for_the_same_node(tmp_path):
+    from boxtwin.database import Database
+    database = Database(str(tmp_path / "dedupe.db"))
+    database.initialize()
+    reading = {"reading_uuid": "dedupe-reading", "node_id": "BOX-01", "volume_m3": .01, "capacity_percent": 90, "confidence_percent": 97, "valid_zones": 64, "status": "alert", "alerts": [], "height_grid_m": grid(.1)}
+    reading_id, _ = database.save_reading(reading)
+    first = database.save_anomalies(reading_id, [{"type": "capacity", "level": "warning", "message": "Capacidade próxima do limite."}])
+    second = database.save_anomalies(reading_id, [{"type": "capacity", "level": "warning", "message": "Capacidade próxima do limite."}])
+    assert len(first) == 1
+    assert second == []

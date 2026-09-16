@@ -1,7 +1,10 @@
 from io import BytesIO
 from zoneinfo import ZoneInfo
+from datetime import datetime, timezone
 
 from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import A4
@@ -95,8 +98,8 @@ def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, read
     analytics_kpis = (analytics or {}).get("kpis", {})
     kpis = [
         ("OCUPAÇÃO ATUAL", _fmt(latest.get("capacity_percent") if latest else None, 1, "%")),
-        ("VOLUME TOTAL", _fmt(analytics_kpis.get("total_volume_m3", sum(item.get("volume_m3", 0) for item in readings)), 4, " m³")),
-        ("TONELADAS EST.", _fmt(analytics_kpis.get("estimated_tons"), 3, " t")),
+        ("VOLUME EST. ATUAL", _fmt(analytics_kpis.get("current_volume_m3"), 4, " m³")),
+        ("MASSA EST. ATUAL", _fmt(analytics_kpis.get("current_estimated_tons"), 3, " t")),
         ("INCIDENTES ATIVOS", str(active_count)),
     ]
     kpi_table = Table([[Table([[Paragraph(value, kpi_value)], [Paragraph(label, kpi_label)]]) for label, value in kpis]], colWidths=[43.25 * mm] * 4)
@@ -113,7 +116,7 @@ def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, read
         ["Estado atual", status_text, "Leituras analisadas", str(len(readings))],
         ["Pico de ocupação", _fmt(max_capacity, 1, "%"), "Tempo médio de leitura", _fmt(analytics_kpis.get("average_reading_ms"), 0, " ms")],
         ["Desvios > +10%", str(analytics_kpis.get("above_expected_count", 0)), "Desvios < -10%", str(analytics_kpis.get("below_expected_count", 0))],
-        ["Dimensões internas", f"{dimensions['length']} m x {dimensions['width']} m x {dimensions['height']} m", "Última leitura", _local_datetime(latest.get("created_at")) if latest else "-"],
+        ["Geometria de referência", f"{dimensions['length']} m x {dimensions['width']} m x {dimensions['height']} m", "Última leitura", _local_datetime(latest.get("created_at")) if latest else "-"],
     ]
     summary = Table(summary_data, colWidths=[31 * mm, 55.5 * mm, 31 * mm, 55.5 * mm])
     summary.setStyle(TableStyle([
@@ -169,7 +172,7 @@ def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, read
     story.extend([Spacer(1, 7 * mm), KeepTogether([
         Paragraph("Nota técnica", section),
         Paragraph(
-            "Este relatório consolida os registros armazenados pelo BoxTwin. No modo simulado, os valores demonstram o fluxo matemático e operacional do MVP; a precisão industrial deverá ser validada com sensor físico, instalação calibrada e volumes de referência conhecidos.",
+            "O volume e a massa estimados representam a última leitura disponível de cada Box incluída no filtro; eles não somam capturas repetidas. A geometria apresentada é a configuração ativa do servidor no momento da exportação. No modo simulado, os valores demonstram o fluxo do MVP; a precisão industrial exige validação com sensor físico, instalação calibrada e volumes de referência conhecidos.",
             body,
         ),
     ])])
@@ -180,96 +183,73 @@ def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, read
 
 def build_operational_workbook(*, box_name, node_id, sensor_mode, dimensions, readings, anomalies, analytics=None):
     workbook = Workbook()
+    navy, blue, white, pale = "071526", "1769FF", "FFFFFF", "F3F7FB"
+    header_fill, pale_fill = PatternFill("solid", fgColor=navy), PatternFill("solid", fgColor=pale)
+    header_font = Font(color=white, bold=True)
+
+    def title_row(sheet, row, values):
+        for column, value in enumerate(values, 1):
+            cell = sheet.cell(row, column, value)
+            cell.fill, cell.font = header_fill, header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    def autosize(sheet):
+        for column_cells in sheet.columns:
+            letter = get_column_letter(column_cells[0].column)
+            sheet.column_dimensions[letter].width = min(48, max(12, max(len(str(cell.value or "")) for cell in column_cells) + 2))
+
     summary_sheet = workbook.active
     summary_sheet.title = "Resumo"
-    summary_sheet.append(["Projeto", "Box", "Node", "Sensor", "Gerado em"])
-    summary_sheet.append([
-        "HydrogenI BoxTwin 3D",
-        box_name,
-        node_id,
-        "Simulado" if sensor_mode == "mock" else "Físico",
-        __import__("datetime").datetime.now(FORTALEZA).strftime("%d/%m/%Y %H:%M"),
-    ])
+    title_row(summary_sheet, 1, ["Projeto", "Box", "Node", "Sensor", "Gerado em"])
+    summary_sheet.append(["HydrogenI BoxTwin 3D", box_name, node_id, "Simulado" if sensor_mode == "mock" else "Físico", datetime.now(FORTALEZA).replace(tzinfo=None)])
+    summary_sheet["E2"].number_format = "dd/mm/yyyy hh:mm"
     summary_sheet.append([])
-    summary_sheet.append(["Comprimento (m)", "Largura (m)", "Altura (m)", "Capacidade (m³)"])
-    summary_sheet.append([
-        dimensions["length"],
-        dimensions["width"],
-        dimensions["height"],
-        dimensions["length"] * dimensions["width"] * dimensions["height"],
-    ])
+    title_row(summary_sheet, 4, ["Comprimento (m)", "Largura (m)", "Altura (m)", "Capacidade geométrica atual (m³)"])
+    summary_sheet.append([dimensions["length"], dimensions["width"], dimensions["height"], dimensions["length"] * dimensions["width"] * dimensions["height"]])
+    for cell in summary_sheet[5]: cell.number_format = "0.00000"
+    summary_sheet.append([])
+    title_row(summary_sheet, 7, ["Indicador", "Valor"])
     kpis = (analytics or {}).get("kpis", {})
-    summary_sheet.append([])
-    summary_sheet.append(["Indicador", "Valor"])
-    summary_sheet.append(["Leituras", kpis.get("readings_count", len(readings))])
-    summary_sheet.append(["Boxes únicos", kpis.get("unique_boxes", 0)])
-    summary_sheet.append(["Volume total (m³)", kpis.get("total_volume_m3", 0)])
-    summary_sheet.append(["Volume médio (m³)", kpis.get("average_volume_m3", 0)])
-    summary_sheet.append(["Toneladas estimadas", kpis.get("estimated_tons", 0)])
-    summary_sheet.append(["Tempo médio de leitura (ms)", kpis.get("average_reading_ms")])
-    summary_sheet.append(["Acima de +10% esperado", kpis.get("above_expected_count", 0)])
-    summary_sheet.append(["Abaixo de -10% esperado", kpis.get("below_expected_count", 0)])
+    values = [
+        ("Leituras no recorte", kpis.get("readings_count", len(readings))), ("Boxes no recorte", kpis.get("unique_boxes", 0)),
+        ("Volume estimado atual (m³)", kpis.get("current_volume_m3", 0)), ("Massa estimada atual (t)", kpis.get("current_estimated_tons", 0)),
+        ("Volume médio por leitura (m³)", kpis.get("average_volume_m3", 0)), ("Tempo médio de leitura (ms)", kpis.get("average_reading_ms")),
+        ("Acima de +10% esperado", kpis.get("above_expected_count", 0)), ("Abaixo de -10% esperado", kpis.get("below_expected_count", 0)),
+    ]
+    for label, value in values: summary_sheet.append([label, value])
+    for row in range(8, 16): summary_sheet.cell(row, 2).number_format = "0.00000"
+    summary_sheet.freeze_panes = "A8"
 
     readings_sheet = workbook.create_sheet("Leituras")
-    readings_sheet.append([
-        "ID",
-        "UUID",
-        "Data e hora",
-        "Cenário",
-        "Volume (m³)",
-        "Ocupação (%)",
-        "Confiança (%)",
-        "Zonas válidas",
-        "Estado",
-        "Box",
-        "Sensor",
-        "Tipo de material",
-        "Material",
-        "Densidade (t/m³)",
-        "Volume esperado (m³)",
-        "Toneladas estimadas",
-        "Tempo de leitura (ms)",
-    ])
+    headers = ["ID", "UUID", "Data e hora", "Cenário", "Volume (m³)", "Ocupação (%)", "Confiança (%)", "Zonas válidas", "Estado", "Box", "Sensor", "Tipo de material", "Material", "Densidade (t/m³)", "Volume esperado (m³)", "Massa estimada (t)", "Tempo de leitura (ms)"]
+    title_row(readings_sheet, 1, headers)
     for item in readings:
-        readings_sheet.append([
-            item.get("id"),
-            item.get("reading_uuid"),
-            _local_datetime(item.get("created_at")),
-            item.get("scenario"),
-            item.get("volume_m3"),
-            item.get("capacity_percent"),
-            item.get("confidence_percent"),
-            item.get("valid_zones"),
-            item.get("status"),
-            item.get("box_id"),
-            item.get("sensor_id"),
-            item.get("material_type"),
-            item.get("material_name"),
-            item.get("density_t_m3"),
-            item.get("expected_volume_m3"),
-            item.get("estimated_tons"),
-            item.get("reading_duration_ms"),
-        ])
+        created = item.get("created_at")
+        try:
+            parsed = datetime.fromisoformat(created.replace("Z", "+00:00")); created = parsed.astimezone(FORTALEZA).replace(tzinfo=None)
+        except (AttributeError, ValueError):
+            pass
+        readings_sheet.append([item.get("id"), item.get("reading_uuid"), created, item.get("scenario"), item.get("volume_m3"), item.get("capacity_percent"), item.get("confidence_percent"), item.get("valid_zones"), item.get("status"), item.get("box_id"), item.get("sensor_id"), item.get("material_type"), item.get("material_name"), item.get("density_t_m3"), item.get("expected_volume_m3"), item.get("estimated_tons"), item.get("reading_duration_ms")])
+    readings_sheet.freeze_panes, readings_sheet.auto_filter.ref = "A2", f"A1:Q{max(1, readings_sheet.max_row)}"
+    for row in range(2, readings_sheet.max_row + 1):
+        readings_sheet.cell(row, 3).number_format = "dd/mm/yyyy hh:mm"
+        for col in (5, 14, 15, 16): readings_sheet.cell(row, col).number_format = "0.00000"
+        for col in (6, 7): readings_sheet.cell(row, col).number_format = "0.0"
 
     anomalies_sheet = workbook.create_sheet("Tratativas")
-    anomalies_sheet.append([
-        "ID",
-        "Data e hora",
-        "Tipo",
-        "Severidade",
-        "Status",
-        "Mensagem",
-    ])
+    title_row(anomalies_sheet, 1, ["ID", "Data e hora", "Tipo", "Severidade", "Status", "Mensagem"])
     for item in anomalies:
-        anomalies_sheet.append([
-            item.get("id"),
-            _local_datetime(item.get("created_at")),
-            item.get("anomaly_type"),
-            item.get("severity"),
-            item.get("status"),
-            item.get("message"),
-        ])
-
-    output = BytesIO()
-    workbook.save(output)
-    return output.getvalue()
+        created = item.get("created_at")
+        try:
+            parsed = datetime.fromisoformat(created.replace("Z", "+00:00")); created = parsed.astimezone(FORTALEZA).replace(tzinfo=None)
+        except (AttributeError, ValueError): pass
+        anomalies_sheet.append([item.get("id"), created, item.get("anomaly_type"), item.get("severity"), item.get("status"), item.get("message")])
+    anomalies_sheet.freeze_panes, anomalies_sheet.auto_filter.ref = "A2", f"A1:F{max(1, anomalies_sheet.max_row)}"
+    for row in range(2, anomalies_sheet.max_row + 1): anomalies_sheet.cell(row, 2).number_format = "dd/mm/yyyy hh:mm"
+    for sheet in workbook.worksheets:
+        for row in sheet.iter_rows(min_row=2):
+            for cell in row:
+                if cell.row % 2 == 0: cell.fill = pale_fill
+                cell.alignment = Alignment(vertical="top", wrap_text=True)
+        autosize(sheet)
+    output = BytesIO(); workbook.save(output); return output.getvalue()

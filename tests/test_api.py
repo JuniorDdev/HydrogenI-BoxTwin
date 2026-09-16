@@ -276,7 +276,7 @@ def test_admin_analytics_reports_operational_metadata(tmp_path):
     assert analytics.status_code == 200
     payload = analytics.get_json()
     assert payload["kpis"]["readings_count"] == 1
-    assert payload["kpis"]["estimated_tons"] > 0
+    assert payload["kpis"]["current_estimated_tons"] > 0
     assert payload["kpis"]["above_expected_count"] == 1
     assert payload["kpis"]["reading_count_anomaly"] is True
     assert payload["kpis"]["reading_count_difference"] == -19
