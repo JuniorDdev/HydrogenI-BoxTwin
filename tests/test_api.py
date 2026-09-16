@@ -157,8 +157,11 @@ def test_remote_commands_are_queued_claimed_and_reported_by_boxnode(tmp_path):
     with client.session_transaction() as session:
         session["admin_authenticated"] = True
 
-    queued = client.post("/api/admin/boxes/BOX-01/commands", json={"action": "capture"})
+    queued = client.post("/api/admin/boxes/BOX-01/commands", json={"action": "capture", "metadata": {
+        "material_type": "areia_seca", "material_name": "Areia seca", "density_t_m3": 1.6,
+    }})
     assert queued.status_code == 202
+    assert queued.get_json()["command"]["payload"]["metadata"]["density_t_m3"] == 1.6
     assert client.post("/api/admin/boxes/BOX-01/commands", json={"action": "calibrate"}).status_code == 409
     command_uuid = queued.get_json()["command"]["command_uuid"]
     assert client.get("/api/edge/commands/next?node_id=BOX-01").status_code == 403
@@ -168,6 +171,7 @@ def test_remote_commands_are_queued_claimed_and_reported_by_boxnode(tmp_path):
     assert claimed.status_code == 200
     assert claimed.get_json()["command"]["command_uuid"] == command_uuid
     assert claimed.get_json()["command"]["status"] == "claimed"
+    assert claimed.get_json()["command"]["payload"]["metadata"]["material_name"] == "Areia seca"
 
     finished = client.post(f"/api/edge/commands/{command_uuid}/result", headers=headers, json={
         "node_id": "BOX-01", "ok": True, "result": {"status": "normal"},
@@ -226,7 +230,12 @@ def test_calibration_requires_manual_start_for_live_monitoring(tmp_path):
     })
     runtime = app.extensions["boxtwin_runtime"]
     assert runtime.calibrate()["live_monitoring"]["status"] == "waiting_capture"
-    result = runtime.capture(distance_grid_mm=[[400 for _ in range(8)] for _ in range(8)])
+    result = runtime.capture(
+        metadata={"material_type": "areia_seca", "material_name": "Areia seca", "density_t_m3": 1.6},
+        distance_grid_mm=[[400 for _ in range(8)] for _ in range(8)],
+    )
+    assert result["material_name"] == "Areia seca"
+    assert result["estimated_tons"] is not None
     assert result["live_monitoring"]["status"] == "waiting_capture"
     assert runtime.set_live_monitoring(True)["status"] == "active"
     assert runtime.calibrate()["live_monitoring"]["status"] == "waiting_capture"

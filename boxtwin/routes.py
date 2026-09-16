@@ -314,7 +314,25 @@ def remote_box_commands(node_id):
         if gate.get("reason") == "in_progress":
             return jsonify({"error": "Já existe um comando aguardando ou em execução para este BoxNode.", **gate}), 409
         return jsonify({"error": "Aguarde antes de solicitar outro comando.", **gate}), 429
-    command = runtime().database.enqueue_command(node_id, action, current_app.config.get("ADMIN_USERNAME", "admin"))
+    metadata = payload.get("metadata") if action == "capture" else None
+    if metadata is not None:
+        if not isinstance(metadata, dict):
+            return jsonify({"error": "Metadados do material inválidos."}), 400
+        try:
+            density = float(metadata.get("density_t_m3", 0))
+        except (TypeError, ValueError):
+            return jsonify({"error": "Densidade do material inválida."}), 400
+        if density < 0 or density > 5:
+            return jsonify({"error": "A densidade deve estar entre 0 e 5 t/m³."}), 400
+        metadata = {
+            "material_type": str(metadata.get("material_type", ""))[:80],
+            "material_name": str(metadata.get("material_name", ""))[:120],
+            "density_t_m3": density,
+        }
+    command = runtime().database.enqueue_command(
+        node_id, action, current_app.config.get("ADMIN_USERNAME", "admin"),
+        {"metadata": metadata} if metadata else {},
+    )
     return jsonify({"accepted": True, "command": command,
                     "cooldown_seconds": current_app.config["REMOTE_COMMAND_COOLDOWN_SECONDS"]}), 202
 

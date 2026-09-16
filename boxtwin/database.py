@@ -167,6 +167,9 @@ class Database:
                     updated_at TEXT NOT NULL
                 );
             """)
+            command_columns = {row[1] for row in connection.execute("PRAGMA table_info(edge_commands)")}
+            if "payload_json" not in command_columns:
+                connection.execute("ALTER TABLE edge_commands ADD COLUMN payload_json TEXT")
             notification_columns = {row[1] for row in connection.execute("PRAGMA table_info(notification_log)")}
             for column in ("provider_message_id", "delivery_status", "recipient_id"):
                 if column not in notification_columns:
@@ -203,17 +206,19 @@ class Database:
             return None
         item = dict(row)
         item["result"] = json.loads(item.pop("result_json") or "null")
+        item["payload"] = json.loads(item.pop("payload_json", None) or "{}")
         return item
 
-    def enqueue_command(self, node_id, action, requested_by=None):
+    def enqueue_command(self, node_id, action, requested_by=None, payload=None):
         from uuid import uuid4
         now = datetime.now(timezone.utc).isoformat()
         command_uuid = str(uuid4())
         with self.connect() as connection:
             connection.execute(
-                """INSERT INTO edge_commands (command_uuid, node_id, action, requested_at, requested_by)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (command_uuid, node_id, action, now, requested_by),
+                """INSERT INTO edge_commands (command_uuid, node_id, action, requested_at, requested_by, payload_json)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (command_uuid, node_id, action, now, requested_by,
+                 json.dumps(payload or {}, ensure_ascii=False)),
             )
             row = connection.execute("SELECT * FROM edge_commands WHERE command_uuid=?", (command_uuid,)).fetchone()
         return self._command_payload(row)

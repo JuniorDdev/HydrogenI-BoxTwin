@@ -187,7 +187,8 @@ class BoxTwinRuntime:
             # Calibrar só registra a referência vazia; não inicia nem atualiza o monitoramento ao vivo.
             return self.calibrate()
         if action == "capture":
-            result = self.capture()
+            payload = command.get("payload") or {}
+            result = self.capture(metadata=payload.get("metadata") or {})
             if result.get("status") == "not_calibrated":
                 raise RuntimeError(result["message"])
             # The reading is durable locally first. Sync it immediately when a link exists.
