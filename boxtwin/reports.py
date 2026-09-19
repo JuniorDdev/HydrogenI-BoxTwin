@@ -43,6 +43,11 @@ def _fmt(value, digits=1, suffix=""):
     return f"{float(value):.{digits}f}{suffix}".replace(".", ",")
 
 
+def _kg(value_tons):
+    """Converte a massa interna, armazenada em toneladas, para kg na apresentação."""
+    return None if value_tons is None else float(value_tons) * 1000
+
+
 def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, readings, anomalies, analytics=None):
     output = BytesIO()
     styles = getSampleStyleSheet()
@@ -99,7 +104,7 @@ def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, read
     kpis = [
         ("OCUPAÇÃO ATUAL", _fmt(latest.get("capacity_percent") if latest else None, 1, "%")),
         ("VOLUME EST. ATUAL", _fmt(analytics_kpis.get("current_volume_m3"), 4, " m³")),
-        ("MASSA EST. ATUAL", _fmt(analytics_kpis.get("current_estimated_tons"), 3, " t")),
+        ("MASSA EST. ATUAL", _fmt(_kg(analytics_kpis.get("current_estimated_tons")), 1, " kg")),
         ("INCIDENTES ATIVOS", str(active_count)),
     ]
     kpi_table = Table([[Table([[Paragraph(value, kpi_value)], [Paragraph(label, kpi_label)]]) for label, value in kpis]], colWidths=[43.25 * mm] * 4)
@@ -129,11 +134,11 @@ def build_operational_report(*, box_name, node_id, sensor_mode, dimensions, read
     story.append(summary)
 
     story.append(Paragraph("Leituras recentes", section))
-    reading_rows = [["Data e hora", "Box / sensor", "Material", "Volume (m³)", "t est.", "Desvio", "Estado"]]
+    reading_rows = [["Data e hora", "Box / sensor", "Material", "Volume (m³)", "Massa (kg)", "Desvio", "Estado"]]
     for item in list(reversed(readings))[:25]:
         reading_rows.append([
             _local_datetime(item.get("created_at")), f"{item.get('box_id') or node_id}\n{item.get('sensor_id') or node_id}", str(item.get("material_name") or item.get("material_type") or "-"), _fmt(item.get("volume_m3"), 4),
-            _fmt(item.get("estimated_tons"), 3), _fmt(((item["volume_m3"] - item["expected_volume_m3"]) / item["expected_volume_m3"] * 100) if item.get("expected_volume_m3") else None, 1, "%"),
+            _fmt(_kg(item.get("estimated_tons")), 1), _fmt(((item["volume_m3"] - item["expected_volume_m3"]) / item["expected_volume_m3"] * 100) if item.get("expected_volume_m3") else None, 1, "%"),
             "Alerta" if item.get("status") == "alert" else "Normal",
         ])
     if len(reading_rows) == 1:
@@ -212,7 +217,7 @@ def build_operational_workbook(*, box_name, node_id, sensor_mode, dimensions, re
     kpis = (analytics or {}).get("kpis", {})
     values = [
         ("Leituras no recorte", kpis.get("readings_count", len(readings))), ("Boxes no recorte", kpis.get("unique_boxes", 0)),
-        ("Volume estimado atual (m³)", kpis.get("current_volume_m3", 0)), ("Massa estimada atual (t)", kpis.get("current_estimated_tons", 0)),
+        ("Volume estimado atual (m³)", kpis.get("current_volume_m3", 0)), ("Massa estimada atual (kg)", _kg(kpis.get("current_estimated_tons", 0))),
         ("Volume médio por leitura (m³)", kpis.get("average_volume_m3", 0)), ("Tempo médio de leitura (ms)", kpis.get("average_reading_ms")),
         ("Acima de +10% esperado", kpis.get("above_expected_count", 0)), ("Abaixo de -10% esperado", kpis.get("below_expected_count", 0)),
     ]
@@ -221,7 +226,7 @@ def build_operational_workbook(*, box_name, node_id, sensor_mode, dimensions, re
     summary_sheet.freeze_panes = "A8"
 
     readings_sheet = workbook.create_sheet("Leituras")
-    headers = ["ID", "UUID", "Data e hora", "Cenário", "Volume (m³)", "Ocupação (%)", "Confiança (%)", "Zonas válidas", "Estado", "Box", "Sensor", "Tipo de material", "Material", "Densidade (t/m³)", "Volume esperado (m³)", "Massa estimada (t)", "Tempo de leitura (ms)"]
+    headers = ["ID", "UUID", "Data e hora", "Cenário", "Volume (m³)", "Ocupação (%)", "Confiança (%)", "Zonas válidas", "Estado", "Box", "Sensor", "Tipo de material", "Material", "Densidade (t/m³)", "Volume esperado (m³)", "Massa estimada (kg)", "Tempo de leitura (ms)"]
     title_row(readings_sheet, 1, headers)
     for item in readings:
         created = item.get("created_at")
@@ -229,7 +234,7 @@ def build_operational_workbook(*, box_name, node_id, sensor_mode, dimensions, re
             parsed = datetime.fromisoformat(created.replace("Z", "+00:00")); created = parsed.astimezone(FORTALEZA).replace(tzinfo=None)
         except (AttributeError, ValueError):
             pass
-        readings_sheet.append([item.get("id"), item.get("reading_uuid"), created, item.get("scenario"), item.get("volume_m3"), item.get("capacity_percent"), item.get("confidence_percent"), item.get("valid_zones"), item.get("status"), item.get("box_id"), item.get("sensor_id"), item.get("material_type"), item.get("material_name"), item.get("density_t_m3"), item.get("expected_volume_m3"), item.get("estimated_tons"), item.get("reading_duration_ms")])
+        readings_sheet.append([item.get("id"), item.get("reading_uuid"), created, item.get("scenario"), item.get("volume_m3"), item.get("capacity_percent"), item.get("confidence_percent"), item.get("valid_zones"), item.get("status"), item.get("box_id"), item.get("sensor_id"), item.get("material_type"), item.get("material_name"), item.get("density_t_m3"), item.get("expected_volume_m3"), _kg(item.get("estimated_tons")), item.get("reading_duration_ms")])
     readings_sheet.freeze_panes, readings_sheet.auto_filter.ref = "A2", f"A1:Q{max(1, readings_sheet.max_row)}"
     for row in range(2, readings_sheet.max_row + 1):
         readings_sheet.cell(row, 3).number_format = "dd/mm/yyyy hh:mm"
